@@ -1102,7 +1102,7 @@ class ColorPickerManager {
     }
 }
 
-function initializeAnnotation() {
+async function initializeAnnotation() {
     console.log('Initializing annotation...');
 
     document.getElementById('tts-play-btn').addEventListener('click', play);
@@ -1112,19 +1112,30 @@ function initializeAnnotation() {
     document.getElementById('tts-prev-btn').addEventListener('click', previousSentence);
 
     // Your tts_settings.js saves to cookies, so we can read from there.
-    const getCookie = (name) => {
-        const value = `; ${document.cookie}`;
-        const parts = value.split(`; ${name}=`);
-        if (parts.length === 2) return parts.pop().split(';').shift();
-    };
+    /**
+     * Retrieves a setting from chrome.storage.local using a modern async/await pattern.
+     * This is the recommended replacement for a synchronous getCookie() function.
+     *
+     * @param {string} key The key of the setting you want to retrieve.
+     * @returns {Promise<any>} A promise that resolves with the stored value, or undefined if not found.
+     */
+    function getCookie(key) {
+        return new Promise((resolve) => {
+            chrome.storage.local.get([key], (result) => {
+                console.log(`Retrieved: ${key} =`, result[key]);
+                resolve(result[key]);
+            });
+        });
+    }
 
-    ttsState.apiKey = getCookie('googleTtsApiKey');
-    const savedVoice = getCookie('selectedVoiceName');
+    ttsState.apiKey = await getCookie('googleTtsApiKey');
+    console.log('Google TTS API key:', ttsState.apiKey);
+    const savedVoice = await getCookie('selectedVoiceName');
     if (savedVoice) ttsState.selectedVoiceName = savedVoice;
 
 
     const colorPickerManager = new ColorPickerManager();
-    
+
     // Store the instance globally for access from other functions
     window.colorPickerManagerInstance = colorPickerManager;
 
@@ -1688,6 +1699,7 @@ async function speakSentence() {
     if (ttsState.apiKey) {
         await speakWithGoogleApi(textToSpeak);
     } else {
+        console.log('Using browser TTS 1', ttsState.apiKey);
         speakWithBrowserApi(textToSpeak);
     }
 }
@@ -1705,7 +1717,8 @@ function speakWithBrowserApi(text) {
 
 async function speakWithGoogleApi(text) {
     // This is the key part adapted for a client-side extension
-    const cacheKey = `${stringToHash(text)}-${ttsState.selectedVoiceName}`;
+    console.log('Using Google API for TTS');
+    const cacheKey =  `${await stringToHashAsync(text)}-${ttsState.selectedVoiceName}`;
     const cachedAudio = ttsState.audioCache.get(cacheKey);
 
     const playAudio = (url) => {
@@ -1771,13 +1784,25 @@ function clearHighlight() {
     document.querySelectorAll('.tts-highlight').forEach(el => el.classList.remove('tts-highlight'));
 }
 
-// Helper from utils.js
-function stringToHash(str) {
-    let hash = 5381;
-    for (let i = 0; i < str.length; i++) {
-        hash = ((hash << 5) + hash) + str.charCodeAt(i);
-    }
-    return hash;
+/**
+ * Hashes a string using the fast and non-blocking Web Crypto API (SHA-256).
+ * This is the recommended replacement for the slow, synchronous JavaScript loop.
+ *
+ * @param {string} str The string to hash.
+ * @returns {Promise<string>} A promise that resolves with the hex string representation of the hash.
+ */
+async function stringToHashAsync(str) {
+    // 1. Encode the string into a byte array.
+    const textAsBuffer = new TextEncoder().encode(str);
+
+    // 2. Use the Web Crypto API to hash the byte array.
+    const hashBuffer = await crypto.subtle.digest('SHA-256', textAsBuffer);
+
+    // 3. Convert the resulting ArrayBuffer to a hexadecimal string.
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
+    return hashHex;
 }
 ////////
 

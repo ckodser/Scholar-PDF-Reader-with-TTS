@@ -85,28 +85,33 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // --- Utility Functions ---
-    const setCookie = (name, value, days = 365) => {
-        const d = new Date();
-        d.setTime(d.getTime() + (days * 24 * 60 * 60 * 1000));
-        const expires = "expires=" + d.toUTCString();
-        document.cookie = `${name}=${value};${expires};path=/;SameSite=Strict`;
-    };
 
-    const getCookie = (name) => {
-        const cname = name + "=";
-        const decodedCookie = decodeURIComponent(document.cookie);
-        const ca = decodedCookie.split(';');
-        for (let i = 0; i < ca.length; i++) {
-            let c = ca[i];
-            while (c.charAt(0) === ' ') {
-                c = c.substring(1);
-            }
-            if (c.indexOf(cname) === 0) {
-                return c.substring(cname.length, c.length);
-            }
-        }
-        return "";
-    };
+    /**
+     * Saves a value to the extension's local storage.
+     * @param {string} key The key to save the data under.
+     * @param {any} value The value to save.
+     */
+    function setCookie(key, value) {
+        chrome.storage.local.set({ [key]: value }, () => {
+            console.log(`Setting saved: ${key} =`, value);
+        });
+    }
+
+    /**
+     * Retrieves a setting from chrome.storage.local using a modern async/await pattern.
+     * This is the recommended replacement for a synchronous getCookie() function.
+     *
+     * @param {string} key The key of the setting you want to retrieve.
+     * @returns {Promise<any>} A promise that resolves with the stored value, or undefined if not found.
+     */
+    function getCookie(key) {
+        return new Promise((resolve) => {
+            chrome.storage.local.get([key], (result) => {
+                console.log(`Retrieved: ${key} =`, result[key]);
+                resolve(result[key]);
+            });
+        });
+    }
 
     const getVoiceTier = (voiceName) => {
         if (voiceName.includes('Studio')) return 'Studio';
@@ -137,11 +142,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Core Functions ---
 
-    const loadSettings = () => {
-        const apiKey = getCookie('googleTtsApiKey');
-        const voiceName = getCookie('selectedVoiceName');
-        const language = getCookie('selectedLanguage');
-        const totalUsage = getCookie('totalApiCost') || 0;
+    const loadSettings = async () => {
+        const apiKey = await getCookie('googleTtsApiKey');
+        const voiceName = await getCookie('selectedVoiceName');
+        const language = await getCookie('selectedLanguage');
+        const totalUsage = await getCookie('totalApiCost') || 0;
 
         if (voiceName) {
             state.selectedVoiceName = voiceName;
@@ -151,8 +156,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (apiKey) {
             elements.apiKeyInput.value = apiKey;
+            elements.languageSelect.value = language || 'en-US';
             state.apiKey = apiKey;
-            validateApiKey(false); // Validate without showing initial status message
+            await validateApiKey(false); // Validate without showing initial status message
         }
     };
 
@@ -167,6 +173,7 @@ document.addEventListener('DOMContentLoaded', () => {
         elements.validateKeyBtn.disabled = true;
 
         try {
+            console.log('Validating API Key...', apiKey);
             const response = await fetch(`https://texttospeech.googleapis.com/v1/voices?key=${apiKey}`);
             const data = await response.json();
 
@@ -179,7 +186,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 elements.voiceSelectionContainer.style.display = 'block';
                 elements.validateKeyBtn.disabled = false;
 
-                populateLanguageSelector();
+                await populateLanguageSelector();
                 renderVoiceTiers();
             } else {
                 throw new Error(data.error?.message || 'Invalid API Key or configuration.');
@@ -201,8 +208,7 @@ document.addEventListener('DOMContentLoaded', () => {
         showStatus('API Key removed.', 'info');
     };
 
-    const populateLanguageSelector = () => {
-        console.log('populateLanguageSelector');
+    const populateLanguageSelector = async () => {
         const languageMap = new Map();
         state.allVoices.forEach(voice => {
             voice.languageCodes.forEach(code => {
@@ -232,7 +238,7 @@ document.addEventListener('DOMContentLoaded', () => {
             elements.languageSelect.appendChild(option);
         });
 
-        elements.languageSelect.value = getCookie('selectedLanguage') || 'en-US';
+        elements.languageSelect.value = await getCookie('selectedLanguage') || 'en-US';
     };
 
     const renderVoiceTiers = () => {
@@ -295,14 +301,6 @@ document.addEventListener('DOMContentLoaded', () => {
     elements.clearKeyBtn.addEventListener('click', clearApiKey);
     elements.saveVoiceBtn.addEventListener('click', saveVoiceSelection);
     elements.languageSelect.addEventListener('change', renderVoiceTiers);
-
-    // Placeholder for annotation functionality
-    elements.exportBtn.addEventListener('click', () => {
-        showStatus('Export functionality is handled by the main extension.', 'info');
-    });
-    elements.importInput.addEventListener('change', () => {
-        showStatus('Import functionality is handled by the main extension.', 'info');
-    });
 
 
     // --- Initialization ---
