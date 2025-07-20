@@ -9,10 +9,41 @@ let ttsState = {
     apiKey: '',
 };
 
+const pdfUrlToTextData = new Map();
 
-// =======================================================================
-// == NEW, ROBUST SENTENCE PROCESSING LOGIC (REPLACES PREVIOUS VERSION) ==
-// =======================================================================
+/// Use PDF.Js by Mozila
+
+/**
+ * Fetches and parses a PDF page using PDF.js, returning its text content.
+ * Caches results to avoid re-fetching the same PDF.
+ *
+ * @param {string} pdfUrl - The URL of the PDF.
+ * @param {number} pageNum - The 1-based page number.
+ * @returns {Promise<Array<Object>>} A promise that resolves with an array of PDF.js text items.
+ */
+async function getPdfTextData(pdfUrl, pageNum) {
+    const cacheKey = `${pdfUrl}-page-${pageNum}`;
+    if (pdfUrlToTextData.has(cacheKey)) {
+        return pdfUrlToTextData.get(cacheKey);
+    }
+
+    try {
+        const loadingTask = pdfjsLib.getDocument(pdfUrl);
+        const pdf = await loadingTask.promise;
+        const page = await pdf.getPage(pageNum);
+        const textContent = await page.getTextContent();
+
+        pdfUrlToTextData.set(cacheKey, textContent.items);
+        return textContent.items;
+    } catch (error) {
+        console.error('Error loading PDF with PDF.js:', error);
+        return null;
+    }
+}
+
+
+
+
 
 /**
  * Processes a rendered page to extract sentences for TTS.
@@ -20,7 +51,18 @@ let ttsState = {
  *
  * @param {HTMLElement} pageElement The .gsr-page element containing the content.
  */
-function processPageForTTS(pageElement) {
+async function processPageForTTS(pageElement, pdfUrl, pageNum) {
+    console.log(`Processing Page ${pageNum} for URL: ${pdfUrl}`);
+
+    // --- 1. Get Text Data from PDF.js (from cache or by fetching) ---
+    const pdfTextItems = await getPdfTextData(pdfUrl, pageNum);
+    if (!pdfTextItems || pdfTextItems.length === 0) {
+        console.log(`No text data from PDF.js for page ${pageNum}.`);
+        return;
+    }
+     const pdfRawText = pdfTextItems.map(item => item.str).join(' ');
+
+
     const textContainer = pageElement.querySelector('.gsr-text-ctn');
     if (!textContainer) {
         console.error("Could not find '.gsr-text-ctn' in page element:", pageElement);
@@ -30,7 +72,6 @@ function processPageForTTS(pageElement) {
     // --- 1. Collect all text-containing elements with a corrected filter ---
     const walker = document.createTreeWalker(textContainer, NodeFilter.SHOW_ELEMENT, {
         acceptNode: (node) => {
-            // THE FIX IS HERE:
             // We accept a node if it's visible and contains text, but has no other ELEMENT children.
             // This correctly finds the "lowest-level" spans/divs that hold the actual text.
             const isVisible = node.offsetParent !== null;
@@ -55,37 +96,37 @@ function processPageForTTS(pageElement) {
         return;
     }
 
-    // --- 2. Create a map of text content back to its source element ---
-    let fullText = '';
-    const textToElementMap = [];
-    elements.forEach(el => {
-        // Use a non-breaking space to ensure words aren't merged, then clean up later.
-        const text = el.textContent + '\u00A0';
-        for (let i = 0; i < text.length; i++) {
-            textToElementMap[fullText.length + i] = el;
-        }
-        fullText += text;
-    });
+
 
     // --- 3. Split the full text into sentences ---
-    const sentenceStrings = fullText.match(/[^.?!]+(?:[.?!](?!['"`\w]))?/g) || [];
+    const sentenceStrings = pdfRawText.match(/[^.?!]+(?:[.?!](?!['"`\w]))?/g) || [];
 
-    for(let i = 0; i < sentenceStrings.length; i++) {
-        console.log(`sentence ${i+1}`, sentenceStrings[i]);
-    }
+
     // --- 4. Map sentence strings back to the original elements ---
-    let charCursor = 0;
+    let elementCursor = 0;
+    let elementCharCursor = 0;
     sentenceStrings.forEach(sentenceText => {
         sentenceText = sentenceText.trim();
         if (sentenceText.length === 0) return;
 
-        const sentenceStartIndex = charCursor;
-        const sentenceEndIndex = charCursor + sentenceText.length - 1;
-
         const sentenceElements = new Set();
-        for (let i = sentenceStartIndex; i <= sentenceEndIndex; i++) {
-            if (textToElementMap[i]) {
-                sentenceElements.add(textToElementMap[i]);
+
+        for (let i = 0; i < sentenceText.length; i++) {
+            if (sentenceText[i] === ' ') {continue;}
+            let jumping = '';
+            while (elementCursor < elements.length) {
+                if (elementCharCursor < elements[elementCursor].textContent.length){
+                    jumping = jumping + elements[elementCursor].textContent[elementCharCursor];
+                    if (elements[elementCursor].textContent[elementCharCursor] === sentenceText[i]) {
+                        sentenceElements.add(elements[elementCursor]);
+                        elementCharCursor++;
+                        break;
+                    }
+                    elementCharCursor++;
+                } else {
+                    elementCursor++;
+                    elementCharCursor = 0;
+                }
             }
         }
 
@@ -113,8 +154,6 @@ function processPageForTTS(pageElement) {
                 });
             });
         }
-
-        charCursor = fullText.indexOf(sentenceText, charCursor) + sentenceText.length;
     });
 }
 
@@ -233,7 +272,7 @@ async function speakSentence() {
 
         await speakWithGoogleApi(textToSpeak, true);
     } else {
-        console.log('Using browser TTS 1', ttsState.apiKey);
+        console.log('Using browser TTS', ttsState.apiKey);
         speakWithBrowserApi(textToSpeak);
     }
 }

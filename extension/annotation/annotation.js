@@ -994,7 +994,23 @@ function observePageChanges() {
                             applyAnnotationsToPage(pageElement, savedAnnotations);
                         });
 
-                        processPageForTTS(pageElement);
+                        let pageNum;
+
+                        // Method 1: Check for a 'data-page-number' attribute first.
+                        if (pageElement.dataset.pageNumber) {
+                            pageNum = parseInt(pageElement.dataset.pageNumber, 10);
+                        } else {
+                            // Method 2 (Fallback): Find the element's index among all pages. This is very reliable.
+                            const allPages = Array.from(document.querySelectorAll('.gsr-page'));
+                            const pageIndex = allPages.indexOf(pageElement);
+
+                            // If the element is found, its 0-based index + 1 is the page number.
+                            if (pageIndex !== -1) {
+                                pageNum = pageIndex + 1;
+                            }
+                        }
+
+                        processPageForTTS(pageElement, pdfUrl, pageNum).then(r => console.log(r));
                     }
                 });
             }
