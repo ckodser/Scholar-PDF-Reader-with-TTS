@@ -5,6 +5,8 @@
 2) Fix wavenet wrongly grouped with standard
 3) Improve UI of setting (make it prettier)
 5) Save the Voices in a local/S3
+6) Improves sentence finding (2.7 is a number not the end of sentence)
+7) Add go to the reading part
 
 # Scholar PDF Reader with Annotations
 
