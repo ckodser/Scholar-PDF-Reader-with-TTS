@@ -5,7 +5,6 @@
 4) Improves sentence finding (2.7 is a number not the end of sentence)
 4) Save the Voices in a local/S3
 3) Improve UI of setting (make it prettier)
-8) Separate TTS codes from annotations 
 9) Have a enable TTS in the settings that shows the buttons
 10) Make a pull request to the original repo
 
