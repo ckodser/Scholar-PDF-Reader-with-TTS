@@ -7,6 +7,9 @@
 5) Save the Voices in a local/S3
 6) Improves sentence finding (2.7 is a number not the end of sentence)
 7) Add go to the reading part
+8) Separate TTS codes from annotations 
+9) Have a enable TTS in the settings that shows the buttons
+10) Make a pull request to the original repo
 
 # Scholar PDF Reader with Annotations
 
