@@ -1,11 +1,10 @@
 # TODO
-1) Going forward and send the api calls to reduce between sentences wait time
 1) Adjusting reading speed, UI, backend, etc. 
 2) Update current session price
+3) Add go to the reading part
+4) Improves sentence finding (2.7 is a number not the end of sentence)
+4) Save the Voices in a local/S3
 3) Improve UI of setting (make it prettier)
-5) Save the Voices in a local/S3
-6) Improves sentence finding (2.7 is a number not the end of sentence)
-7) Add go to the reading part
 8) Separate TTS codes from annotations 
 9) Have a enable TTS in the settings that shows the buttons
 10) Make a pull request to the original repo
