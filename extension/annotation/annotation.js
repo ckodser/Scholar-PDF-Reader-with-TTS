@@ -9,48 +9,265 @@ document.addEventListener('mousemove', (e) => {
     mouseY = e.clientY;
 });
 
+let ttsState = {
+    sentences: [],
+    currentSentenceIndex: 0,
+    isSpeaking: false,
+    isPaused: false,
+    audioCache: new Map(),
+    // We'll get these from cookies/storage later
+    selectedVoiceName: 'en-US-Wavenet-D',
+    apiKey: '',
+};
+
 // Constants and utilities
 const TOOLS = {
     highlight: {
         id: 'highlight-btn',
         colors: ['yellow', 'greenyellow', 'cyan', 'magenta', 'red']
     },
-    draw: {
-        id: 'draw-btn',
-        colors: ['white', 'black', 'red', 'green', 'blue']
-    },
-    text: {
-        id: 'text-btn',
-        colors: ['white', 'black', 'red', 'green', 'blue']
-    }
+    // draw: {
+    //     id: 'draw-btn',
+    //     colors: ['white', 'black', 'red', 'green', 'blue']
+    // },
+    // text: {
+    //     id: 'text-btn',
+    //     colors: ['white', 'black', 'red', 'green', 'blue']
+    // }
 };
+
+// =======================================================================
+// == NEW, ROBUST SENTENCE PROCESSING LOGIC (REPLACES PREVIOUS VERSION) ==
+// =======================================================================
+
+/**
+ * Processes a rendered page to extract sentences for TTS.
+ * This version uses a corrected TreeWalker filter.
+ *
+ * @param {HTMLElement} pageElement The .gsr-page element containing the content.
+ */
+function processPageForTTS(pageElement) {
+    const textContainer = pageElement.querySelector('.gsr-text-ctn');
+    if (!textContainer) {
+        console.error("Could not find '.gsr-text-ctn' in page element:", pageElement);
+        return;
+    }
+
+    // --- 1. Collect all text-containing elements with a corrected filter ---
+    const walker = document.createTreeWalker(textContainer, NodeFilter.SHOW_ELEMENT, {
+        acceptNode: (node) => {
+            // THE FIX IS HERE:
+            // We accept a node if it's visible and contains text, but has no other ELEMENT children.
+            // This correctly finds the "lowest-level" spans/divs that hold the actual text.
+            const isVisible = node.offsetParent !== null;
+            const hasText = node.textContent.trim() !== '';
+            const hasNoElementChildren = !node.querySelector('*'); // Check if it has any element children
+
+            if (isVisible && hasText && hasNoElementChildren) {
+                return NodeFilter.FILTER_ACCEPT;
+            }
+            return NodeFilter.FILTER_REJECT;
+        }
+    });
+
+    const elements = [];
+    while (walker.nextNode()) {
+        elements.push(walker.currentNode);
+    }
+
+    // Your check is perfect here.
+    if (elements.length === 0){
+        console.log('No text elements found on this page, skipping...');
+        return;
+    }
+
+    // --- 2. Create a map of text content back to its source element ---
+    let fullText = '';
+    const textToElementMap = [];
+    elements.forEach(el => {
+        // Use a non-breaking space to ensure words aren't merged, then clean up later.
+        const text = el.textContent + '\u00A0';
+        for (let i = 0; i < text.length; i++) {
+            textToElementMap[fullText.length + i] = el;
+        }
+        fullText += text;
+    });
+
+    // --- 3. Split the full text into sentences ---
+    const sentenceStrings = fullText.match(/[^.?!]+(?:[.?!](?!['"`\w]))?/g) || [];
+
+    // --- 4. Map sentence strings back to the original elements ---
+    let charCursor = 0;
+    sentenceStrings.forEach(sentenceText => {
+        sentenceText = sentenceText.trim();
+        if (sentenceText.length === 0) return;
+
+        const sentenceStartIndex = charCursor;
+        const sentenceEndIndex = charCursor + sentenceText.length - 1;
+
+        const sentenceElements = new Set();
+        for (let i = sentenceStartIndex; i <= sentenceEndIndex; i++) {
+            if (textToElementMap[i]) {
+                sentenceElements.add(textToElementMap[i]);
+            }
+        }
+
+        const sentenceSpans = Array.from(sentenceElements);
+        if (sentenceSpans.length > 0) {
+            const sentenceIndex = ttsState.sentences.length;
+            const newSentence = {
+                text: sentenceText,
+                spans: sentenceSpans,
+                index: sentenceIndex
+            };
+            ttsState.sentences.push(newSentence);
+
+            // --- 5. DEBUGGING: Log and highlight the found sentence ---
+            console.log(`%c[TTS Sentence ${sentenceIndex}]:`, 'color: blue; font-weight: bold;', sentenceText);
+            // debugHighlight(sentenceSpans);
+
+
+            sentenceSpans.forEach(span => {
+                 span.addEventListener('click', (e) => {
+                    if (!window.colorPickerManagerInstance.activeTools.isHighlighting && !window.colorPickerManagerInstance.activeTools.isErasing) {
+                        e.stopPropagation();
+                        jumpToSentenceAndPlay(sentenceIndex);
+                    }
+                });
+            });
+        }
+
+        charCursor = fullText.indexOf(sentenceText, charCursor) + sentenceText.length;
+    });
+}
+
+
+/**
+ * Groups text nodes into sentences and wraps each sentence in a SPAN.
+ * This is the core of the new automatic processing logic.
+ */
+function groupTextIntoSentences(textNodes) {
+    const sentences = [];
+    const endOfSentenceRegex = /([.?!])\s*$/;
+    const abbreviationRegex = /(Mr|Mrs|Ms|Dr|Jr|Sr|etc|i\.e|e\.g)\.$/i;
+
+    let currentSentenceNodes = [];
+    let currentSentenceText = '';
+
+    textNodes.forEach(node => {
+        const text = node.textContent;
+        // Check if adding this node completes a sentence
+        if (endOfSentenceRegex.test(text.trim()) && !abbreviationRegex.test(text.trim())) {
+            currentSentenceNodes.push(node);
+            currentSentenceText += text;
+
+            // Finalize and wrap the completed sentence
+            const sentenceSpan = wrapNodesInSpan(currentSentenceNodes);
+            sentences.push({
+                text: currentSentenceText.replace(/\s+/g, ' ').trim(),
+                span: sentenceSpan, // The single span wrapping the whole sentence
+                spans: [sentenceSpan] // Keep `spans` as an array for compatibility
+            });
+
+            // Reset for the next sentence
+            currentSentenceNodes = [];
+            currentSentenceText = '';
+        } else {
+            // This node is part of the current sentence, but not the end
+            currentSentenceNodes.push(node);
+            currentSentenceText += text;
+        }
+    });
+
+    // Wrap any remaining nodes as the last sentence
+    if (currentSentenceNodes.length > 0) {
+        const sentenceSpan = wrapNodesInSpan(currentSentenceNodes);
+        sentences.push({
+            text: currentSentenceText.replace(/\s+/g, ' ').trim(),
+            span: sentenceSpan,
+            spans: [sentenceSpan]
+        });
+    }
+
+    return sentences;
+}
+
+/**
+ * A helper function that wraps an array of DOM nodes into a single parent SPAN.
+ * This uses the same `Range` principles as your highlighter.
+ */
+function wrapNodesInSpan(nodes) {
+    if (!nodes || nodes.length === 0) return null;
+
+    const range = document.createRange();
+    const firstNode = nodes[0];
+    const lastNode = nodes[nodes.length - 1];
+
+    // Create a range that starts at the beginning of the first node
+    // and ends at the end of the last node.
+    range.setStart(firstNode, 0);
+    range.setEnd(lastNode, lastNode.length);
+
+    const sentenceSpan = document.createElement('span');
+    sentenceSpan.className = 'tts-sentence-container'; // Assign a class for potential styling
+
+    // The `surroundContents` method wraps the entire range in our new span.
+    // This may merge or modify the original text nodes.
+    try {
+        range.surroundContents(sentenceSpan);
+    } catch(e) {
+        // In complex DOMs, surroundContents can fail. We log the error.
+        // A more robust fallback would be needed for production.
+        console.warn("Could not wrap sentence nodes, likely due to complex structure.", e);
+        return nodes[0].parentElement; // Return the parent as a fallback
+    }
+
+    return sentenceSpan;
+}
+
+/**
+ * DEBUGGING HELPER: Applies a random background color to a set of elements.
+ * @param {HTMLElement[]} elements - The array of elements to highlight.
+ */
+function debugHighlight(elements) {
+    // Generate a random, light, semi-transparent color for highlighting
+    const r = Math.floor(Math.random() * 155) + 100; // 100-255
+    const g = Math.floor(Math.random() * 155) + 100; // 100-255
+    const b = Math.floor(Math.random() * 155) + 100; // 100-255
+    const randomColor = `rgba(${r}, ${g}, ${b}, 0.5)`;
+
+    elements.forEach(el => {
+        el.style.backgroundColor = randomColor;
+        el.style.cursor = 'pointer'; // Make it obvious it's clickable
+    });
+}
 
 class ColorPickerManager {
     constructor() {
         this.activeTools = {
             isHighlighting: false,
-            isDrawing: false,
-            isTexting: false,
+            // isDrawing: false,
+            // isTexting: false,
             isErasing: false
         };
         this.currentColors = {
             highlight: TOOLS.highlight.colors[0],
-            draw: TOOLS.draw.colors[0],
-            text: TOOLS.text.colors[0]
+            // draw: TOOLS.draw.colors[0],
+            // text: TOOLS.text.colors[0]
         };
         
         // Custom colors for each tool
         this.customColors = {
             highlight: '#FF4500', // Default custom color - orange red
-            draw: '#8A2BE2',      // Default custom color - blue violet
-            text: '#20B2AA'       // Default custom color - light sea green
+            // draw: '#8A2BE2',      // Default custom color - blue violet
+            // text: '#20B2AA'       // Default custom color - light sea green
         };
         
         // Current HSV values for each tool
         this.hsvValues = {
             highlight: { h: 16, s: 100, v: 100 },  // Orange-red
-            draw: { h: 271, s: 76, v: 74 },        // Blue-violet
-            text: { h: 174, s: 81, v: 70 }         // Light sea green
+            // draw: { h: 271, s: 76, v: 74 },        // Blue-violet
+            // text: { h: 174, s: 81, v: 70 }         // Light sea green
         };
         
         // Flags for the color picker drag operations
@@ -471,9 +688,9 @@ class ColorPickerManager {
             
             // Update cursor
             this.updateCursor({ target: document.elementFromPoint(mouseX, mouseY) });
-        } else if (toolType === 'draw' || toolType === 'text') {
-            // For unimplemented tools, show the alert but don't activate the tool
-            alert('This feature is not implemented yet!');
+        // } else if (toolType === 'draw' || toolType === 'text') {
+        //     // For unimplemented tools, show the alert but don't activate the tool
+        //     alert('This feature is not implemented yet!');
         }
     }
 
@@ -491,10 +708,10 @@ class ColorPickerManager {
     updateCursor(event) {
         if (this.activeTools.isHighlighting) {
             document.body.style.cursor = 'crosshair';
-        } else if (this.activeTools.isDrawing) {
-            document.body.style.cursor = 'crosshair';
-        } else if (this.activeTools.isTexting) {
-            document.body.style.cursor = 'text';
+        // } else if (this.activeTools.isDrawing) {
+        //     document.body.style.cursor = 'crosshair';
+        // } else if (this.activeTools.isTexting) {
+        //     document.body.style.cursor = 'text';
         } else if (this.activeTools.isErasing) {
             document.body.style.cursor = 'pointer';
         } else {
@@ -545,15 +762,15 @@ class ColorPickerManager {
                     this.activateTool('highlight');
                     break;
                     
-                case 'd':
-                    // Activate/deactivate draw tool (not implemented)
-                    this.activateTool('draw');
-                    break;
-                    
-                case 't':
-                    // Activate/deactivate text tool (not implemented)
-                    this.activateTool('text');
-                    break;
+                // case 'd':
+                //     // Activate/deactivate draw tool (not implemented)
+                //     this.activateTool('draw');
+                //     break;
+                //
+                // case 't':
+                //     // Activate/deactivate text tool (not implemented)
+                //     this.activateTool('text');
+                //     break;
                     
                 case 'e':
                     // Activate/deactivate erase tool
@@ -622,10 +839,10 @@ class ColorPickerManager {
         }
         
         // For unimplemented tools, show an alert
-        if ((toolType === 'draw' || toolType === 'text')) {
-            alert('This feature is not implemented yet!');
-            return;
-        }
+        // if ((toolType === 'draw' || toolType === 'text')) {
+        //     alert('This feature is not implemented yet!');
+        //     return;
+        // }
         
         // Reset all tool states
         Object.keys(this.activeTools).forEach(key => {
@@ -647,10 +864,10 @@ class ColorPickerManager {
         
         if (this.activeTools.isHighlighting) {
             activeTool = 'highlight';
-        } else if (this.activeTools.isDrawing) {
-            activeTool = 'draw';
-        } else if (this.activeTools.isTexting) {
-            activeTool = 'text';
+        // } else if (this.activeTools.isDrawing) {
+        //     activeTool = 'draw';
+        // } else if (this.activeTools.isTexting) {
+        //     activeTool = 'text';
         }
         
         // If no color tool is active, do nothing
@@ -684,10 +901,10 @@ class ColorPickerManager {
         
         if (this.activeTools.isHighlighting) {
             activeTool = 'highlight';
-        } else if (this.activeTools.isDrawing) {
-            activeTool = 'draw';
-        } else if (this.activeTools.isTexting) {
-            activeTool = 'text';
+        // } else if (this.activeTools.isDrawing) {
+        //     activeTool = 'draw';
+        // } else if (this.activeTools.isTexting) {
+        //     activeTool = 'text';
         }
         
         // If no color tool is active, do nothing
@@ -887,6 +1104,25 @@ class ColorPickerManager {
 
 function initializeAnnotation() {
     console.log('Initializing annotation...');
+
+    document.getElementById('tts-play-btn').addEventListener('click', play);
+    document.getElementById('tts-pause-btn').addEventListener('click', pause);
+    document.getElementById('tts-stop-btn').addEventListener('click', stop);
+    document.getElementById('tts-next-btn').addEventListener('click', nextSentence);
+    document.getElementById('tts-prev-btn').addEventListener('click', previousSentence);
+
+    // Your tts_settings.js saves to cookies, so we can read from there.
+    const getCookie = (name) => {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return parts.pop().split(';').shift();
+    };
+
+    ttsState.apiKey = getCookie('googleTtsApiKey');
+    const savedVoice = getCookie('selectedVoiceName');
+    if (savedVoice) ttsState.selectedVoiceName = savedVoice;
+
+
     const colorPickerManager = new ColorPickerManager();
     
     // Store the instance globally for access from other functions
@@ -927,8 +1163,8 @@ function setupButtonHandlers(colorPickerManager) {
     document.getElementById(TOOLS.highlight.id).addEventListener('click', () => {
         colorPickerManager.activateTool('highlight');
     });
-    document.getElementById(TOOLS.draw.id).addEventListener('click', alertNotImplemented);
-    document.getElementById(TOOLS.text.id).addEventListener('click', alertNotImplemented);
+    // document.getElementById(TOOLS.draw.id).addEventListener('click', alertNotImplemented);
+    // document.getElementById(TOOLS.text.id).addEventListener('click', alertNotImplemented);
 
     // Other buttons
     document.getElementById('erase-btn').addEventListener('click', () => {
@@ -941,9 +1177,9 @@ function setupButtonHandlers(colorPickerManager) {
         chrome.runtime.openOptionsPage();
     });
 
-    document.getElementById('star-btn').addEventListener('click', () => {
-        chrome.tabs.create({ url: 'https://github.com/salcc/Scholar-PDF-Reader-with-Annotations' });
-    });
+    // document.getElementById('star-btn').addEventListener('click', () => {
+    //     chrome.tabs.create({ url: 'https://github.com/salcc/Scholar-PDF-Reader-with-Annotations' });
+    // });
 }
 
 
@@ -954,6 +1190,8 @@ function observePageChanges() {
                 mutation.addedNodes.forEach((node) => {
                     if (node.nodeType === Node.ELEMENT_NODE && node.classList.contains('gsr-text-ctn')) {
                         console.log('New page content loaded, applying annotations');
+                        const pageElement = node.closest('.gsr-page');
+
                         chrome.storage.local.get([pdfUrl], function (result) {
                             if (chrome.runtime.lastError) {
                                 console.error('Error loading annotations:', chrome.runtime.lastError);
@@ -961,8 +1199,10 @@ function observePageChanges() {
                             }
                             const savedAnnotations = result[pdfUrl] || [];
                             console.log('Loaded annotations:', savedAnnotations);
-                            applyAnnotationsToPage(node.closest('.gsr-page'), savedAnnotations);
+                            applyAnnotationsToPage(pageElement, savedAnnotations);
                         });
+
+                        processPageForTTS(pageElement);
                     }
                 });
             }
@@ -1363,6 +1603,184 @@ function highlightNode(node, text, color, groupId) {
         return null;
     }
 }
+
+
+//////////////// tts.js
+// This would be a new file: tts_playback.js
+
+// --- Playback Controls ---
+
+function play() {
+    if (!ttsState.sentences.length || (ttsState.isSpeaking && !ttsState.isPaused)) return;
+
+    if (ttsState.isPaused) {
+        // Resume logic here (for both Google API and browser)
+        if (ttsState.apiKey && ttsState.globalAudioElement) {
+             ttsState.globalAudioElement.play();
+        } else {
+            window.speechSynthesis.resume();
+        }
+        ttsState.isPaused = false;
+        ttsState.isSpeaking = true;
+        updatePlaybackUI();
+        return;
+    }
+
+    ttsState.isSpeaking = true;
+    ttsState.isPaused = false;
+    updatePlaybackUI();
+    speakSentence();
+}
+
+function pause() {
+    if (ttsState.isSpeaking && !ttsState.isPaused) {
+        if (ttsState.apiKey && ttsState.globalAudioElement) {
+            ttsState.globalAudioElement.pause();
+        } else {
+            window.speechSynthesis.pause();
+        }
+        ttsState.isPaused = true;
+        updatePlaybackUI();
+    }
+}
+
+function stop() {
+    window.speechSynthesis.cancel();
+    if (ttsState.globalAudioElement) {
+        ttsState.globalAudioElement.pause();
+        ttsState.globalAudioElement.src = "";
+    }
+    ttsState.isSpeaking = false;
+    ttsState.isPaused = false;
+    ttsState.currentSentenceIndex = 0;
+    clearHighlight();
+    updatePlaybackUI();
+}
+
+function nextSentence() {
+    jumpToSentenceAndPlay(ttsState.currentSentenceIndex + 1);
+}
+
+function previousSentence() {
+    jumpToSentenceAndPlay(ttsState.currentSentenceIndex - 1);
+}
+
+function jumpToSentenceAndPlay(index) {
+    if (index < 0 || index >= ttsState.sentences.length) return;
+    stop(); // Stop current playback
+    ttsState.currentSentenceIndex = index;
+    play();
+}
+
+// --- Core Speech Logic ---
+
+async function speakSentence() {
+    if (ttsState.currentSentenceIndex >= ttsState.sentences.length) {
+        stop();
+        return;
+    }
+
+    const sentence = ttsState.sentences[ttsState.currentSentenceIndex];
+    const textToSpeak = sentence.text; // Add filtering logic here if needed
+
+    highlightSentence(sentence.spans);
+
+    if (ttsState.apiKey) {
+        await speakWithGoogleApi(textToSpeak);
+    } else {
+        speakWithBrowserApi(textToSpeak);
+    }
+}
+
+function speakWithBrowserApi(text) {
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.onend = () => {
+        if (!ttsState.isSpeaking) return;
+        ttsState.currentSentenceIndex++;
+        speakSentence();
+    };
+    utterance.onerror = (e) => console.error('Browser TTS Error:', e);
+    window.speechSynthesis.speak(utterance);
+}
+
+async function speakWithGoogleApi(text) {
+    // This is the key part adapted for a client-side extension
+    const cacheKey = `${stringToHash(text)}-${ttsState.selectedVoiceName}`;
+    const cachedAudio = ttsState.audioCache.get(cacheKey);
+
+    const playAudio = (url) => {
+        if (!ttsState.globalAudioElement) ttsState.globalAudioElement = new Audio();
+        ttsState.globalAudioElement.src = url;
+        ttsState.globalAudioElement.play();
+        ttsState.globalAudioElement.onended = () => {
+            if (!ttsState.isSpeaking) return;
+            ttsState.currentSentenceIndex++;
+            speakSentence();
+        };
+    };
+
+    if (cachedAudio) {
+        playAudio(cachedAudio);
+        return;
+    }
+
+    // Fetch from Google TTS API
+    try {
+        const response = await fetch(`https://texttospeech.googleapis.com/v1/text:synthesize?key=${ttsState.apiKey}`, {
+            method: 'POST',
+            body: JSON.stringify({
+                input: { text: text },
+                voice: { languageCode: ttsState.selectedVoiceName.substring(0, 5), name: ttsState.selectedVoiceName },
+                audioConfig: { audioEncoding: 'MP3' }
+            })
+        });
+
+        if (!response.ok) throw new Error(`Google TTS Error: ${(await response.json()).error.message}`);
+
+        const data = await response.json();
+        const audioBlob = new Blob([Uint8Array.from(atob(data.audioContent), c => c.charCodeAt(0))], { type: 'audio/mp3' });
+        const localUrl = URL.createObjectURL(audioBlob);
+
+        ttsState.audioCache.set(cacheKey, localUrl); // Cache for this session
+        // For persistence, you could save this to chrome.storage.local
+
+        playAudio(localUrl);
+    } catch (error) {
+        console.error(error);
+        stop(); // Stop playback on error
+    }
+}
+
+// --- UI Helper Functions (can be in a separate tts_ui.js) ---
+
+function updatePlaybackUI() {
+    const playBtn = document.getElementById('tts-play-btn');
+    const pauseBtn = document.getElementById('tts-pause-btn');
+
+    playBtn.classList.toggle('hidden', ttsState.isSpeaking && !ttsState.isPaused);
+    pauseBtn.classList.toggle('hidden', !ttsState.isSpeaking || ttsState.isPaused);
+}
+
+function highlightSentence(spans) {
+    clearHighlight();
+    spans.forEach(span => span.classList.add('tts-highlight'));
+    spans[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function clearHighlight() {
+    document.querySelectorAll('.tts-highlight').forEach(el => el.classList.remove('tts-highlight'));
+}
+
+// Helper from utils.js
+function stringToHash(str) {
+    let hash = 5381;
+    for (let i = 0; i < str.length; i++) {
+        hash = ((hash << 5) + hash) + str.charCodeAt(i);
+    }
+    return hash;
+}
+////////
+
 
 
 // Initialize when the DOM is ready

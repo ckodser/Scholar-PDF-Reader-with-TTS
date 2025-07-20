@@ -258,3 +258,18 @@
 .pdf-highlight {
     opacity: 0.5;
 }
+
+/* Style for the sentence being read aloud */
+.tts-highlight {
+    background-color: rgba(255, 165, 0, 0.5) !important; /* A distinct orange highlight */
+    transition: background-color 0.3s;
+}
+
+/* A simple class to hide/show buttons like Play/Pause */
+.hidden {
+    display: none;
+}
+
+.tts-sentence-container {
+    cursor: pointer;
+}

@@ -1,0 +1,310 @@
+/**
+ * settings.js
+ * * Handles all logic for the settings page, including API key validation,
+ * voice selection, and loading/saving settings via cookies to be consistent
+ * with the main application.
+ */
+
+console.log('TTS Settings Page');
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('TTS Settings Page2 - DOMContentLoaded');
+    // --- DOM Elements ---
+    const elements = {
+        apiKeyInput: document.getElementById('api-key-input'),
+        validateKeyBtn: document.getElementById('validate-key-btn'),
+        clearKeyBtn: document.getElementById('clear-key-btn'),
+        totalUsageDisplay: document.getElementById('total-usage'),
+        voiceSelectionContainer: document.getElementById('voice-selection-container'),
+        languageSelect: document.getElementById('language-select'),
+        languageSelectLabel: document.getElementById('language-select-label'),
+        saveVoiceBtnContainer: document.getElementById('save-voice-btn-container'),
+        totalUsageContainer: document.getElementById('total-usage-container'),
+        voiceTierContainer: document.getElementById('voice-tier-container'),
+        saveVoiceBtn: document.getElementById('save-voice-btn'),
+        status: document.getElementById('status'),
+    };
+
+    // --- State ---
+    const state = {
+        allVoices: [],
+        selectedVoiceName: 'en-US-Wavenet-D', // Default
+        apiKey: '',
+    };
+
+    // --- Constants ---
+    const VOICE_TIER_DATA = {
+        'Standard': {
+            name: 'Standard',
+            price: 4.00,
+            desc: 'Basic, robotic-sounding synthesis.',
+            freeTier: '4 million',
+            sku: '9D01-5995-B545'
+        },
+        'WaveNet': {
+            name: 'WaveNet',
+            price: 16.00,
+            desc: "High-fidelity, natural-sounding voices.",
+            freeTier: '1 million',
+            sku: 'FEBD-04B6-769B'
+        },
+        'Neural2': {
+            name: 'Neural2',
+            price: 16.00,
+            desc: "Google's next-generation high-fidelity voices.",
+            freeTier: '1 million',
+            sku: 'FEBD-04B6-769B'
+        },
+        'Polyglot': {
+            name: 'Polyglot',
+            price: 16.00,
+            desc: 'Voices designed to speak multiple languages fluently.',
+            freeTier: '1 million',
+            sku: 'FEBD-04B6-769B'
+        },
+        'Chirp 3: HD': {
+            name: 'Chirp 3: HD',
+            price: 30.00,
+            desc: 'High-definition voices for superior audio clarity.',
+            freeTier: '1 million',
+            sku: 'F977-2280-6F1B'
+        },
+        'Instant Custom Voice': {
+            name: 'Instant Custom Voice',
+            price: 60.00,
+            desc: 'Create a unique voice from audio samples.',
+            freeTier: 'N/A',
+            sku: 'A247-37D7-C094'
+        },
+        'Studio': {
+            name: 'Studio',
+            price: 160.00,
+            desc: 'Highest-quality, most expressive voices.',
+            freeTier: '1 million',
+            sku: '84AB-48C0-F9C3'
+        }
+    };
+
+    // --- Utility Functions ---
+    const setCookie = (name, value, days = 365) => {
+        const d = new Date();
+        d.setTime(d.getTime() + (days * 24 * 60 * 60 * 1000));
+        const expires = "expires=" + d.toUTCString();
+        document.cookie = `${name}=${value};${expires};path=/;SameSite=Strict`;
+    };
+
+    const getCookie = (name) => {
+        const cname = name + "=";
+        const decodedCookie = decodeURIComponent(document.cookie);
+        const ca = decodedCookie.split(';');
+        for (let i = 0; i < ca.length; i++) {
+            let c = ca[i];
+            while (c.charAt(0) === ' ') {
+                c = c.substring(1);
+            }
+            if (c.indexOf(cname) === 0) {
+                return c.substring(cname.length, c.length);
+            }
+        }
+        return "";
+    };
+
+    const getVoiceTier = (voiceName) => {
+        if (voiceName.includes('Studio')) return 'Studio';
+        if (voiceName.includes('Neural2')) return 'Neural2';
+        if (voiceName.includes('WaveNet')) return 'WaveNet';
+        if (voiceName.includes('Polyglot')) return 'Polyglot';
+        if (voiceName.includes('Chirp')) return 'Chirp 3: HD';
+        return 'Standard';
+    };
+
+    const getFlagEmoji = (countryCode) => {
+        if (!countryCode) return '🌐';
+        const codePoints = countryCode
+            .toUpperCase()
+            .split('')
+            .map(char => 127397 + char.charCodeAt());
+        return String.fromCodePoint(...codePoints);
+    };
+
+    const showStatus = (message, type = 'info') => {
+        elements.status.textContent = message;
+        elements.status.className = type; // 'success', 'error', or 'info'
+        // Automatically hide after 5 seconds
+        setTimeout(() => {
+            elements.status.className = '';
+        }, 5000);
+    };
+
+    // --- Core Functions ---
+
+    const loadSettings = () => {
+        const apiKey = getCookie('googleTtsApiKey');
+        const voiceName = getCookie('selectedVoiceName');
+        const language = getCookie('selectedLanguage');
+        const totalUsage = getCookie('totalApiCost') || 0;
+
+        if (voiceName) {
+            state.selectedVoiceName = voiceName;
+        }
+
+        elements.totalUsageDisplay.textContent = `$${parseFloat(totalUsage).toFixed(6)}`;
+
+        if (apiKey) {
+            elements.apiKeyInput.value = apiKey;
+            state.apiKey = apiKey;
+            validateApiKey(false); // Validate without showing initial status message
+        }
+    };
+
+    const validateApiKey = async (showAlerts = true) => {
+        const apiKey = elements.apiKeyInput.value.trim();
+        if (!apiKey) {
+            if (showAlerts) showStatus('Please enter an API key.', 'error');
+            return;
+        }
+
+        if (showAlerts) showStatus('Validating key...', 'info');
+        elements.validateKeyBtn.disabled = true;
+
+        try {
+            const response = await fetch(`https://texttospeech.googleapis.com/v1/voices?key=${apiKey}`);
+            const data = await response.json();
+
+            if (response.ok && data.voices) {
+                if (showAlerts) showStatus('API Key is valid!', 'success');
+                state.apiKey = apiKey;
+                setCookie('googleTtsApiKey', apiKey);
+                state.allVoices = data.voices;
+
+                elements.voiceSelectionContainer.style.display = 'block';
+                elements.validateKeyBtn.disabled = false;
+
+                populateLanguageSelector();
+                renderVoiceTiers();
+            } else {
+                throw new Error(data.error?.message || 'Invalid API Key or configuration.');
+            }
+        } catch (error) {
+            console.error('API Key validation error:', error);
+            if (showAlerts) showStatus(`Error: ${error.message}`, 'error');
+            elements.voiceSelectionContainer.style.display = 'none';
+            elements.validateKeyBtn.disabled = false;
+        }
+    };
+
+    const clearApiKey = () => {
+        elements.apiKeyInput.value = '';
+        state.apiKey = '';
+        setCookie('googleTtsApiKey', '', -1); // Expire the cookie
+        elements.voiceSelectionContainer.style.display = 'none';
+        state.allVoices = [];
+        showStatus('API Key removed.', 'info');
+    };
+
+    const populateLanguageSelector = () => {
+        console.log('populateLanguageSelector');
+        const languageMap = new Map();
+        state.allVoices.forEach(voice => {
+            voice.languageCodes.forEach(code => {
+                if (!languageMap.has(code)) {
+                    try {
+                        const langName = new Intl.DisplayNames(['en'], {type: 'language'}).of(code.split('-')[0]);
+                        languageMap.set(code, {name: langName, code: code});
+                    } catch (e) {
+                        languageMap.set(code, {name: code, code: code});
+                    }
+                }
+            });
+        });
+
+        elements.languageSelect.style.display = 'block';
+        elements.languageSelectLabel.style.display = 'block';
+        elements.saveVoiceBtnContainer.style.display = 'block';
+        elements.totalUsageContainer.style.display = 'block';
+
+        const sortedLanguages = [...languageMap.values()].sort((a, b) => a.name.localeCompare(b.name));
+        elements.languageSelect.innerHTML = '';
+        sortedLanguages.forEach(({name, code}) => {
+            const option = document.createElement('option');
+            const countryCode = code.split('-')[1] || '';
+            option.value = code;
+            option.textContent = `${getFlagEmoji(countryCode)} ${name} (${code})`;
+            elements.languageSelect.appendChild(option);
+        });
+
+        elements.languageSelect.value = getCookie('selectedLanguage') || 'en-US';
+    };
+
+    const renderVoiceTiers = () => {
+        const selectedLang = elements.languageSelect.value;
+        const voicesForLang = state.allVoices.filter(v => v.languageCodes.includes(selectedLang));
+        const tiers = {};
+
+        voicesForLang.forEach(voice => {
+            const tierKey = getVoiceTier(voice.name);
+            if (!tiers[tierKey]) tiers[tierKey] = [];
+            tiers[tierKey].push(voice);
+        });
+
+        elements.voiceTierContainer.innerHTML = '';
+        Object.keys(VOICE_TIER_DATA).forEach(tierKey => {
+            if (tiers[tierKey] && tiers[tierKey].length > 0) {
+                const tierInfo = VOICE_TIER_DATA[tierKey];
+                const card = document.createElement('div');
+                card.className = 'voice-tier-card';
+                let voiceOptionsHTML = tiers[tierKey].map(voice => `
+                    <div>
+                        <label class="voice-option">
+                            <input type="radio" name="voice-selection" value="${voice.name}" ${voice.name === state.selectedVoiceName ? 'checked' : ''}>
+                            <span>${voice.name} (${voice.ssmlGender.toLowerCase()})</span>
+                        </label>
+                    </div>
+                `).join('');
+
+                card.innerHTML = `
+                    <div class="tier-header">
+                        <h4>${tierInfo.name}</h4>
+                        <span class="tier-price">$${tierInfo.price.toFixed(2)} / 1M chars</span>
+                    </div>
+                    <p class="tier-desc">${tierInfo.desc}</p>
+                    <div class="tier-details">
+                        <span><strong>SKU:</strong> ${tierInfo.sku}</span>
+                        <span><strong>Free Tier:</strong> ${tierInfo.freeTier === 'N/A' ? 'N/A' : `${tierInfo.freeTier} chars/month`}</span>
+                    </div>
+                    <div class="mt-3 space-y-2">${voiceOptionsHTML}</div>
+                `;
+                elements.voiceTierContainer.appendChild(card);
+            }
+        });
+    };
+
+    const saveVoiceSelection = () => {
+        const selectedRadio = document.querySelector('input[name="voice-selection"]:checked');
+        if (selectedRadio) {
+            state.selectedVoiceName = selectedRadio.value;
+            setCookie('selectedVoiceName', state.selectedVoiceName);
+            setCookie('selectedLanguage', elements.languageSelect.value);
+            showStatus(`Voice set to ${state.selectedVoiceName}.`, 'success');
+        } else {
+            showStatus('Please select a voice first.', 'error');
+        }
+    };
+
+    // --- Event Listeners ---
+    elements.validateKeyBtn.addEventListener('click', () => validateApiKey(true));
+    elements.clearKeyBtn.addEventListener('click', clearApiKey);
+    elements.saveVoiceBtn.addEventListener('click', saveVoiceSelection);
+    elements.languageSelect.addEventListener('change', renderVoiceTiers);
+
+    // Placeholder for annotation functionality
+    elements.exportBtn.addEventListener('click', () => {
+        showStatus('Export functionality is handled by the main extension.', 'info');
+    });
+    elements.importInput.addEventListener('change', () => {
+        showStatus('Import functionality is handled by the main extension.', 'info');
+    });
+
+
+    // --- Initialization ---
+    loadSettings();
+});

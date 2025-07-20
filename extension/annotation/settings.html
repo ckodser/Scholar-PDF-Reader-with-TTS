@@ -10,7 +10,7 @@
             font-style: normal;
             src: url('MaterialSymbolsOutlined.woff2') format('woff2');
         }
-        
+
         :root {
             --primary: #4374E0;
             --primary-hover: #3865cc;
@@ -81,7 +81,7 @@
         .section {
             margin-bottom: 40px;
             padding-bottom: 32px;
-            border-bottom: 1px solid rgba(0,0,0,0.05);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
         }
 
         .section:last-of-type {
@@ -116,19 +116,19 @@
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
             user-select: none;
         }
 
         button:hover, .file-input-label:hover {
             background-color: var(--primary-hover);
             transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
         }
 
         button:active, .file-input-label:active {
             transform: translateY(0);
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
 
         button.secondary, .file-input-label {
@@ -166,8 +166,14 @@
         }
 
         @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-10px); }
-            to { opacity: 1; transform: translateY(0); }
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         #status.success {
@@ -234,62 +240,133 @@
         .github-button:hover {
             background-color: #1a1e22;
             transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
         }
 
         @media (max-width: 600px) {
             .container {
                 padding: 30px 20px;
             }
-            
+
             .github-section {
                 flex-direction: column;
                 align-items: flex-start;
             }
-            
+
             .github-buttons {
                 width: 100%;
             }
-            
+
             .github-button {
                 flex: 1;
                 justify-content: center;
             }
         }
+
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        .icon {
+            font-family: 'Material Symbols Outlined', serif;
+            font-weight: normal;
+            font-style: normal;
+            font-size: 20px;
+            line-height: 1;
+            letter-spacing: normal;
+            text-transform: none;
+            display: inline-block;
+            white-space: nowrap;
+            word-wrap: normal;
+            direction: ltr;
+            -webkit-font-smoothing: antialiased;
+        }
     </style>
+    <link rel="stylesheet" href="tts_settings.css">
 </head>
 <body>
-    <div class="container">
-        <h1>Scholar PDF Reader with Annotations / Settings</h1>
-        
-        <div class="section">
-            <h2>Backup and Restore</h2>
-            <p>Export your annotations to keep them safe or import previously saved annotations.</p>
-            
-            <div class="button-group">
-                <button id="exportBtn">
-                    <span class="icon">download</span>Export Annotations
+<div class="container">
+    <h1>Scholar PDF Reader with Annotations / Settings</h1>
+
+    <div class="section">
+        <h2>Backup and Restore</h2>
+        <p>Export your annotations to keep them safe or import previously saved annotations.</p>
+
+        <div class="button-group">
+            <button id="exportBtn">
+                <span class="icon">download</span>Export Annotations
+            </button>
+            <label class="file-input-label">
+                <span class="icon">upload</span>Import Annotations
+                <input type="file" id="importInput" accept=".json">
+            </label>
+        </div>
+    </div>
+    <!-- Google Cloud TTS Section -->
+    <div class="mt-8 pt-8 border-t border-gray-200">
+        <h2 class="text-xl font-semibold text-gray-700">Google Cloud TTS</h2>
+        <p class="text-gray-500 mt-2">Configure your Google Cloud Text-to-Speech API key and voice preferences. This is
+            required for the text-to-speech feature.</p>
+
+        <div class="mt-6">
+            <h3 class="text-base font-semibold text-gray-600">API Key</h3>
+            <div class="flex gap-2 mt-2">
+                <input type="password" id="api-key-input" placeholder="Enter Google Cloud API Key" style="padding: 0.75rem 1rem; font-size: 1rem; width: 300px;">
+                <button id="validate-key-btn"
+                        class="inline-flex items-center px-4 py-2.5 bg-green-500 text-white font-semibold rounded-lg shadow-sm hover:bg-green-600 transition">
+                    <span class="icon mr-2">key</span>Validate
                 </button>
-                <label class="file-input-label">
-                    <span class="icon">upload</span>Import Annotations
-                    <input type="file" id="importInput" accept=".json">
-                </label>
+                <button id="clear-key-btn"
+                        class="inline-flex items-center px-4 py-2.5 bg-red-500 text-white font-semibold rounded-lg shadow-sm hover:bg-red-600 transition">
+                    <span class="icon mr-2">delete</span>Remove
+                </button>
             </div>
         </div>
-        <div id="status"></div>
-        
-        <div class="github-section">
-            <div class="github-content">
-                <h3>Do you find the extension useful?</h3>
-                <p>Star the repository on GitHub to show your support!</p>
+
+        <div class="mt-6" style="display:none" id="total-usage-container">
+            <h3 class="text-base font-semibold text-gray-600">Total Usage</h3>
+            <p class="text-gray-500 text-sm">Estimated cost for the current session. Resets when browser is closed.</p>
+            <p id="total-usage" class="text-2xl font-bold text-blue-600 mt-1">$0.000000</p>
+        </div>
+
+        <div id="voice-selection-container" class="mt-8 pt-8 border-t border-gray-200">
+            <div>
+                <label id = "language-select-label" for="language-select" class="text-base font-semibold text-gray-600" style="display:none">Language</label>
+                <select id="language-select"  style="display:none"
+                        class="mt-2 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
+                    <!-- Options populated by JS -->
+                </select>
             </div>
-            <div class="github-buttons">
-                <a href="https://github.com/salcc/Scholar-PDF-Reader-with-Annotations" class="github-button" target="_blank">
-                    <span class="icon">star</span>Star Repository
-                </a>
+            <div id="voice-tier-container" class="mt-4 space-y-4">
+                <!-- Voice models and prices populated by JS from settings.js -->
+                <!-- The structure inside here will be created by your JS, e.g., .voice-tier-card -->
+            </div>
+            <div id = "save-voice-btn-container" class="mt-6" style="display:none">
+                <button id="save-voice-btn"
+                        class="inline-flex items-center px-5 py-2.5 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition">
+                    <span class="icon mr-2">save</span>Save Voice Selection
+                </button>
             </div>
         </div>
     </div>
-    <script src="settings.js"></script>
+
+    <!-- Status Message -->
+    <div id="status" class="hidden mt-8 p-4 rounded-lg"></div>
+
+    <div class="github-section">
+        <div class="github-content">
+            <h3>Do you find the extension useful?</h3>
+            <p>Star the repository on GitHub to show your support!</p>
+        </div>
+        <div class="github-buttons">
+            <a href="https://github.com/salcc/Scholar-PDF-Reader-with-Annotations" class="github-button"
+               target="_blank">
+                <span class="icon">star</span>Star Repository
+            </a>
+        </div>
+    </div>
+</div>
+<script src="settings.js"></script>
+<script src="tts_settings.js"></script>
 </body>
 </html>
