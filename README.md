@@ -1,3 +1,11 @@
+# TODO
+1) Going forward and send the api calls to reduce between sentences wait time
+1) Adjusting reading speed, UI, backend, etc. 
+2) Update current session price
+2) Fix wavenet wrongly grouped with standard
+3) Improve UI of setting (make it prettier)
+5) Save the Voices in a local/S3
+
 # Scholar PDF Reader with Annotations
 
 This extension adds annotation capabilities to the Google Scholar PDF Reader extension. The extended features include:
