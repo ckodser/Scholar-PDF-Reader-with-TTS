@@ -2,7 +2,6 @@
 1) Adjusting reading speed, UI, backend, etc. 
 2) Update current session price
 3) Add go to the reading part
-4) Improves sentence finding (2.7 is a number not the end of sentence)
 4) Save the Voices in a local/S3
 5) Change name to google scholar pdf reader with annotations "& TTS"
 3) Improve UI of setting (make it prettier)

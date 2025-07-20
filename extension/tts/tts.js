@@ -99,8 +99,7 @@ async function processPageForTTS(pageElement, pdfUrl, pageNum) {
 
 
     // --- 3. Split the full text into sentences ---
-    const sentenceStrings = pdfRawText.match(/[^.?!]+(?:[.?!](?!['"`\w]))?/g) || [];
-
+    const sentenceStrings = pdfRawText.split(/(?<=[.?!])\s+/).filter(s => s.trim());
 
     // --- 4. Map sentence strings back to the original elements ---
     let elementCursor = 0;
@@ -109,6 +108,7 @@ async function processPageForTTS(pageElement, pdfUrl, pageNum) {
         sentenceText = sentenceText.trim();
         if (sentenceText.length === 0) return;
 
+        console.log(`Sentence Text: ${sentenceText}`);
         const sentenceElements = new Set();
 
         for (let i = 0; i < sentenceText.length; i++) {
