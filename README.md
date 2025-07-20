@@ -2,7 +2,6 @@
 1) Going forward and send the api calls to reduce between sentences wait time
 1) Adjusting reading speed, UI, backend, etc. 
 2) Update current session price
-2) Fix wavenet wrongly grouped with standard
 3) Improve UI of setting (make it prettier)
 5) Save the Voices in a local/S3
 6) Improves sentence finding (2.7 is a number not the end of sentence)

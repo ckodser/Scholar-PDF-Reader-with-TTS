@@ -116,7 +116,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const getVoiceTier = (voiceName) => {
         if (voiceName.includes('Studio')) return 'Studio';
         if (voiceName.includes('Neural2')) return 'Neural2';
-        if (voiceName.includes('WaveNet')) return 'WaveNet';
+        if (voiceName.includes('Wavenet')) return 'WaveNet';
         if (voiceName.includes('Polyglot')) return 'Polyglot';
         if (voiceName.includes('Chirp')) return 'Chirp 3: HD';
         return 'Standard';
