@@ -22,19 +22,22 @@ const GEMINI_MODELS_DATA = {
         pricing: {
             input: { text: 1.25, document: 1.25 },
             output: { text: 10.00 }
-        }
+        },
+        name: 'Gemini 2.5 Pro',
     },
     'gemini-2.5-flash': {
         pricing: {
             input: { text: 0.30, document: 0.30 },
             output: { text: 2.50 }
-        }
+        },
+        name: 'Gemini 2.5 Flash',
     },
     'gemini-2.5-flash-lite-preview-06-17': {
         pricing: {
             input: { text: 0.10, document: 0.10 },
             output: { text: 0.40 }
-        }
+        },
+        name: 'Gemini 2.5 Flash Lite Preview',
     }
 };
 
