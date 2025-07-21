@@ -12,6 +12,7 @@ let aiChatState = {
     isPanelExpanded: false,
     isAnalyzing: false,
     pdfDataB64: null,
+    pdfId: null,
     tabs: [],
     activeTabId: null,
 };
@@ -65,10 +66,16 @@ function cacheDomElements() {
 function getStorage(key) {
     return new Promise((resolve) => chrome.storage.local.get([key], (result) => resolve(result[key])));
 }
+function setStorage(data) {
+    return new Promise((resolve) => chrome.storage.local.set(data, resolve));
+}
 
 async function getPdfUrlWithRetry(retries = 10, delay = 500) {
     for (let i = 0; i < retries; i++) {
-        if (window.pdfUrl) return window.pdfUrl;
+        if (window.pdfUrl){
+            aiChatState.pdfId = window.pdfUrl;
+            return window.pdfUrl;
+        }
         await new Promise(resolve => setTimeout(resolve, delay));
     }
     throw new Error("Could not find the PDF URL after multiple attempts.");
@@ -156,7 +163,7 @@ function renderActiveTabMessages() {
 
 // --- Tab and Conversation Logic ---
 
-function createNewTab() {
+async function createNewTab() {
     const tabId = `tab-${Date.now()}`;
     const newTab = {
         id: tabId,
@@ -165,18 +172,24 @@ function createNewTab() {
         isInitialized: false,
     };
     aiChatState.tabs.push(newTab);
-    switchTab(tabId);
+    await switchTab(tabId); // Await the switch, which also handles saving.
 }
 
-function switchTab(tabId) {
+async function switchTab(tabId) {
+    if (aiChatState.activeTabId === tabId) return; // No action if already active
+
     aiChatState.activeTabId = tabId;
     renderTabs();
     renderActiveTabMessages();
+
     const activeTab = aiChatState.tabs.find(t => t.id === tabId);
     if (activeTab && !activeTab.isInitialized) {
-        preparePdfForConversation();
+        await preparePdfForConversation();
     }
+    // Save the state after any tab switch.
+    await saveConversations();
 }
+
 
 async function preparePdfForConversation() {
     const activeTab = aiChatState.tabs.find(t => t.id === aiChatState.activeTabId);
@@ -232,6 +245,7 @@ async function handleSendMessage() {
 
         // Record usage after a successful call
         await recordGeminiUsage(responseData);
+        await saveConversations();
 
         thinkingMessage.remove();
         renderMessage('ai', responseText);
@@ -311,12 +325,57 @@ async function recordGeminiUsage(responseData) {
     }
 }
 
+/**
+ * Saves the current state of conversations for the active PDF to chrome.storage.
+ */
+async function saveConversations() {
+    if (!aiChatState.pdfId) {
+        console.warn("Cannot save conversations without a PDF ID.");
+        return;
+    }
+    try {
+        const allHistories = await getStorage('allChatHistories') || {};
+        allHistories[aiChatState.pdfId] = {
+            tabs: aiChatState.tabs,
+            activeTabId: aiChatState.activeTabId,
+            lastUpdated: new Date().toISOString()
+        };
+        await setStorage({ allChatHistories: allHistories });
+    } catch (error) {
+        console.error("Error saving conversations:", error);
+    }
+}
+
+/**
+ * Loads conversations for the active PDF from chrome.storage and populates the state.
+ */
+async function loadConversations() {
+    try {
+        const pdfId = await getPdfUrlWithRetry();
+        if (!pdfId) return;
+
+        const allHistories = await getStorage('allChatHistories') || {};
+        const pdfHistory = allHistories[pdfId];
+        console.log(`Loading conversations for PDF: ${pdfId}`);
+        if (pdfHistory && pdfHistory.tabs && pdfHistory.tabs.length > 0) {
+            aiChatState.tabs = pdfHistory.tabs;
+            aiChatState.activeTabId = pdfHistory.activeTabId || pdfHistory.tabs[0].id;
+            console.log(`Loaded ${aiChatState.tabs.length} chat tabs for this PDF.`);
+        } else {
+            console.log('No saved conversations found for this PDF.');
+        }
+    } catch (error) {
+        console.error("Error loading conversations:", error);
+    }
+}
 
 // --- Initialization ---
 
 async function initializeAiChat() {
     console.log('Initializing AI Chat...');
     cacheDomElements();
+
+    await loadConversations();
 
     aiChatState.apiKey = await getStorage('geminiApiKey');
     const savedModel = await getStorage('selectedGeminiModel');
@@ -334,6 +393,9 @@ async function initializeAiChat() {
         dom.chatActivateBtn.classList.add('hidden');
         dom.aiChatBorder.classList.add('hidden');
     }
+
+    renderTabs();
+    renderActiveTabMessages();
 
     dom.chatActivateBtn.addEventListener('click', toggleChatPanel);
     dom.chatCloseBtn.addEventListener('click', toggleChatPanel);
