@@ -307,7 +307,7 @@ async function speakWithGoogleApi(text, read_aloud) {
 
 // --- UI Helper Functions ---
 function updatePlaybackUI() {
-    document.getElementById('tts-play-btn').classList.toggle('hidden', ttsState.isSpeaking && !ttsState.isPaused);
+    document.getElementById('tts-play-btn').classList.toggle('hidden', ttsState.isSpeaking && !ttsState.isPaused && !ttsState.isEnabled);
     document.getElementById('tts-pause-btn').classList.toggle('hidden', !ttsState.isSpeaking || ttsState.isPaused);
 }
 function highlightSentence(spans) {
