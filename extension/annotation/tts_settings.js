@@ -179,6 +179,7 @@ document.addEventListener('DOMContentLoaded', () => {
             setCookie('googleTtsApiKey', apiKey);
             state.allVoices = data.voices;
             elements.voiceSelectionContainer.style.display = 'block';
+            elements.languageSelectWrapper.style.display = 'block';
             await populateLanguageSelector();
             renderVoiceTiers();
         } catch (error) {
@@ -194,6 +195,8 @@ document.addEventListener('DOMContentLoaded', () => {
         state.apiKey = '';
         chrome.storage.local.remove('googleTtsApiKey');
         elements.voiceSelectionContainer.style.display = 'none';
+        elements.languageSelectWrapper.style.display = 'none';
+        elements.totalUsageContainer.style.display = 'none';
         state.allVoices = [];
         showStatus('API Key removed.', 'success');
     };

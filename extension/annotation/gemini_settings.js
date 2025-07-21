@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
         modelSelectionContainer: document.getElementById('gemini-model-selection-container'),
         saveModelBtn: document.getElementById('save-gemini-model-btn'),
         status: document.getElementById('status'), // Re-using the general status element
+        geminiUsageContainer: document.getElementById('total-gemini-usage-container'),
     };
 
     // --- State ---
@@ -145,6 +146,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 setStorage('geminiApiKey', apiKey);
 
                 elements.modelSelectionContainer.style.display = 'block';
+                elements.geminiUsageContainer.style.display = 'block';
                 renderModelSelection();
             } else {
                 const error = data.error?.message || 'Invalid API Key or insufficient permissions.';
@@ -154,6 +156,7 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('Gemini API Key validation error:', error);
             if (showAlerts) showStatus(`Validation Error: ${error.message}`, 'error');
             elements.modelSelectionContainer.style.display = 'none';
+            elements.geminiUsageContainer.style.display = 'none';
         } finally {
             elements.validateKeyBtn.disabled = false;
         }
@@ -167,6 +170,7 @@ document.addEventListener('DOMContentLoaded', () => {
         state.apiKey = '';
         chrome.storage.local.remove('geminiApiKey');
         elements.modelSelectionContainer.style.display = 'none';
+        elements.geminiUsageContainer.style.display = 'none';
         showStatus('Gemini API Key removed.', 'success');
     };
 

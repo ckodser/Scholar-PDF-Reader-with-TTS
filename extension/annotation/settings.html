@@ -323,7 +323,7 @@
             <span class="icon">receipt_long</span>
             <div class="usage-info">
                 <h3>Total Usage</h3>
-                <p>Estimated cost for the current session.</p>
+                <p>Estimated cost for the current token.</p>
             </div>
             <div id="total-usage" class="usage-amount">$0.000000</div>
         </div>
@@ -354,14 +354,26 @@
         <h2>Gemini AI Chat</h2>
         <p>Configure your Google AI Gemini API key and model preferences. Required for the AI chat feature.</p>
         <a href="https://aistudio.google.com/apikey">Get api from this link</a>
-        <div>
-            <h3>API Key</h3>
-            <div class="button-group" style="margin-top: 12px;">
-                <input type="password" id="ai-chat-api-key-input" placeholder="Enter Google AI Gemini API Key"
-                       style="padding: 10px; font-size: 14px; flex-grow: 1; border: 1px solid #ccc; border-radius: 8px;">
-                <button id="ai-chat-validate-key-btn"><span class="icon">key</span>Validate</button>
-                <button id="ai-chat-clear-key-btn" class="secondary"><span class="icon">delete</span>Remove</button>
+        <div style="margin-bottom: 24px;">
+            <div>
+                <h3>API Key</h3>
+                <div class="button-group" style="margin-top: 12px;">
+                    <input type="password" id="ai-chat-api-key-input" placeholder="Enter Google AI Gemini API Key"
+                           style="padding: 10px; font-size: 14px; flex-grow: 1; border: 1px solid #ccc; border-radius: 8px;">
+                    <button id="ai-chat-validate-key-btn"><span class="icon">key</span>Validate</button>
+                    <button id="ai-chat-clear-key-btn" class="secondary"><span class="icon">delete</span>Remove</button>
+                </div>
             </div>
+        </div>
+
+        <!-- Total Usage Card -->
+        <div id="total-gemini-usage-container" class="total-usage-card" style="display:none;">
+            <span class="icon">receipt_long</span>
+            <div class="usage-info">
+                <h3>Total Gemini Usage</h3>
+                <p>Estimated cost for the current token.</p>
+            </div>
+            <div id="total-usage-gemini" class="usage-amount">$0.000000</div>
         </div>
 
         <div id="gemini-model-selection-container" style="display:none; margin-top: 24px;">
