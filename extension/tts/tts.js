@@ -1,6 +1,7 @@
 let ttsState = {
     sentences: [],
     currentSentenceIndex: 0,
+    isEnabled: false,
     isSpeaking: false,
     isPaused: false,
     audioCache: new Map(),
@@ -147,7 +148,7 @@ async function processPageForTTS(pageElement, pdfUrl, pageNum) {
 
             sentenceSpans.forEach(span => {
                 span.addEventListener('click', (e) => {
-                    if (!window.colorPickerManagerInstance.activeTools.isHighlighting && !window.colorPickerManagerInstance.activeTools.isErasing) {
+                    if (!window.colorPickerManagerInstance.activeTools.isHighlighting && !window.colorPickerManagerInstance.activeTools.isErasing && ttsState.isEnabled) {
                         e.stopPropagation();
                         jumpToSentenceAndPlay(sentenceIndex);
                     }
@@ -177,9 +178,47 @@ function debugHighlight(elements) {
 
 
 // --- Playback Controls ---
+function activateTTS() {
+    const btnPrev = document.getElementById('tts-prev-btn');
+    const btnPlay = document.getElementById('tts-play-btn');
+    const btnPause = document.getElementById('tts-pause-btn');
+    const btnStop = document.getElementById('tts-stop-btn');
+    const btnNext = document.getElementById('tts-next-btn');
+    const activateText = document.getElementById('tts-activate-btn-text');
+    const ttsActivateBtn = document.getElementById('tts-activate-btn');
+    if(ttsState.isEnabled){
+        // Deactivate
+        ttsState.isEnabled = false;
+
+        btnPrev.classList.toggle('hidden', true);
+        btnPlay.classList.toggle('hidden', true);
+        btnPause.classList.toggle('hidden', true);
+        btnStop.classList.toggle('hidden', true);
+        btnNext.classList.toggle('hidden', true);
+        activateText.textContent = "volume_up";
+        ttsActivateBtn.dataset.tooltip = "Activate TTS";
+    }else {
+        //Activate
+        ttsState.isEnabled = true;
+
+        btnPrev.classList.toggle('hidden', false);
+        btnPlay.classList.toggle('hidden', false);
+        btnPause.classList.toggle('hidden', true);
+        btnStop.classList.toggle('hidden', true);
+        btnNext.classList.toggle('hidden', false);
+        activateText.textContent = "volume_off";
+        ttsActivateBtn.dataset.tooltip = "Deactivate TTS";
+    }
+}
+
 
 function play() {
     if (!ttsState.sentences.length || (ttsState.isSpeaking && !ttsState.isPaused)) return;
+
+    const btnActivate = document.getElementById('tts-activate-btn');
+    const btnStop = document.getElementById('tts-stop-btn');
+    btnActivate.classList.toggle('hidden', true);
+    btnStop.classList.toggle('hidden', false);
 
     if (ttsState.isPaused) {
         // Resume logic here (for both Google API and browser)
@@ -213,6 +252,11 @@ function pause() {
 }
 
 function stop() {
+    const btnActivate = document.getElementById('tts-activate-btn');
+    const btnStop = document.getElementById('tts-stop-btn');
+    btnActivate.classList.toggle('hidden', false);
+    btnStop.classList.toggle('hidden', true);
+
     window.speechSynthesis.cancel();
     if (ttsState.globalAudioElement) {
         ttsState.globalAudioElement.pause();
@@ -393,7 +437,7 @@ async function initializeTTS() {
     document.getElementById('tts-stop-btn').addEventListener('click', stop);
     document.getElementById('tts-next-btn').addEventListener('click', nextSentence);
     document.getElementById('tts-prev-btn').addEventListener('click', previousSentence);
-
+    document.getElementById('tts-activate-btn').addEventListener('click', activateTTS);
     // Your tts_settings.js saves to cookies, so we can read from there.
     /**
      * Retrieves a setting from chrome.storage.local using a modern async/await pattern.
