@@ -31,7 +31,7 @@ function cacheDomElements() {
     dom.processingOverlay = document.getElementById('chat-processing-overlay');
     dom.tabsContainer = document.getElementById('chat-tabs-container');
     dom.newTabBtn = document.getElementById('chat-new-tab-btn');
-    dom.headerTitle = document.getElementById('chat-header-title'); // Get the header title span
+    dom.headerTitle = document.getElementById('chat-header-title');
 }
 
 // --- Utility Functions ---
@@ -84,13 +84,20 @@ function toggleChatSize() {
 function renderMessage(sender, text) {
     const messageWrapper = document.createElement('div');
     messageWrapper.className = `chat-message ${sender}`;
-    const avatar = document.createElement('div');
-    avatar.className = 'avatar';
-    avatar.innerHTML = `<span class="material-symbols-outlined">${sender === 'user' ? 'person' : 'auto_awesome'}</span>`;
+
     const messageContent = document.createElement('div');
     messageContent.className = 'message-content';
+
+    // // Check if the marked library is available before using it
+    // if (sender === 'ai' && typeof marked === 'function') {
+    //     // Removed the sanitize option, which was likely stripping the HTML tags.
+    //     messageContent.innerHTML = marked.parse(text);
+    // } else {
+    //     // For user messages or if marked is not available, just set text content.
+    //     messageContent.textContent = text;
+    // }
     messageContent.textContent = text;
-    messageWrapper.appendChild(avatar);
+
     messageWrapper.appendChild(messageContent);
     dom.chatMessages.appendChild(messageWrapper);
     dom.chatMessages.scrollTop = dom.chatMessages.scrollHeight;
@@ -105,7 +112,7 @@ function renderTabs() {
         tabButton.className = `chat-tab ${tab.id === aiChatState.activeTabId ? 'active' : ''}`;
         tabButton.textContent = tab.name;
         tabButton.dataset.tabId = tab.id;
-        tabButton.title = tab.name; // Add tooltip for long names
+        tabButton.title = tab.name;
         tabButton.addEventListener('click', () => switchTab(tab.id));
         dom.tabsContainer.insertBefore(tabButton, dom.newTabBtn);
     });
@@ -188,7 +195,7 @@ async function handleSendMessage() {
 
     const thinkingMessage = document.createElement('div');
     thinkingMessage.className = 'chat-message ai thinking-indicator';
-    thinkingMessage.innerHTML = `<div class="avatar"><span class="material-symbols-outlined">auto_awesome</span></div><div class="message-content">Thinking...</div>`;
+    thinkingMessage.innerHTML = `<div class="message-content">Thinking...</div>`;
     dom.chatMessages.appendChild(thinkingMessage);
     dom.chatMessages.scrollTop = dom.chatMessages.scrollHeight;
 
@@ -234,7 +241,6 @@ async function initializeAiChat() {
     if (aiChatState.apiKey) {
         dom.chatActivateBtn.classList.remove('hidden');
         dom.aiChatBorder.classList.remove('hidden');
-        // Set the header title to the model name
         if (dom.headerTitle) {
             dom.headerTitle.textContent = aiChatState.model;
         }
