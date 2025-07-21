@@ -248,12 +248,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 const card = document.createElement('div');
                 card.className = 'voice-tier-card';
                 let voiceOptionsHTML = tiers[tierKey].map(voice => `
-                    <div>
-                        <label class="voice-option">
-                            <input type="radio" name="voice-selection" value="${voice.name}" ${voice.name === state.selectedVoiceName ? 'checked' : ''}>
-                            <span>${voice.name} (${voice.ssmlGender.toLowerCase()})</span>
-                        </label>
-                    </div>
                     <label class="voice-option">
                         <input type="radio" name="voice-selection" value="${voice.name}" ${voice.name === state.selectedVoiceName ? 'checked' : ''}>
                         <span>${voice.name.split('-').slice(2).join('-')} (${voice.ssmlGender.toLowerCase()})</span>
