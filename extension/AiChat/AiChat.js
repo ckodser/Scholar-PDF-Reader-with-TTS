@@ -111,15 +111,14 @@ function renderMessage(sender, text) {
     const messageContent = document.createElement('div');
     messageContent.className = 'message-content';
 
-    // // Check if the marked library is available before using it
-    // if (sender === 'ai' && typeof marked === 'function') {
-    //     // Removed the sanitize option, which was likely stripping the HTML tags.
-    //     messageContent.innerHTML = marked.parse(text);
-    // } else {
-    //     // For user messages or if marked is not available, just set text content.
-    //     messageContent.textContent = text;
-    // }
-    messageContent.textContent = text;
+    // Check if sender is 'ai' and if the marked OBJECT is available.
+    if (sender === 'ai' && typeof marked === 'object') {
+        // Call the .parse() method on the marked object.
+        messageContent.innerHTML = marked.parse(text);
+    } else {
+        // For user messages or if marked is not available, just set text content.
+        messageContent.textContent = text;
+    }
 
     messageWrapper.appendChild(messageContent);
     dom.chatMessages.appendChild(messageWrapper);
