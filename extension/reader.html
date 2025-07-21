@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="/tts/tts.css">
   <link rel="stylesheet" href="/annotation/annotation.css">
   <link rel="stylesheet" href="/AiChat/AiChat.css">
+
   <script src="/reader-compiled.js" defer></script>
   <script src="/annotation/annotation.js" defer></script>
   <script src="/tts/tts.js" defer></script>
@@ -16,19 +17,20 @@
 
   <style>
     .hidden {
-        display: none;
+        display: none !important;
     }
   </style>
 </head>
 <body>
   <div class="gsr-root-wrap"></div>
 
-<!-- AI Chat Panel Structure -->
-  <div id="ai-chat-panel">
+  <!-- AI Chat Panel Structure - Starts hidden -->
+  <div id="ai-chat-panel" class="hidden">
     <div class="chat-header">
         <h3>
             <span class="material-symbols-outlined">network_intelligence</span>
-            Chat with PDF
+            <!-- This span will now be updated by the script -->
+            <span id="chat-header-title">Chat with PDF</span>
         </h3>
         <div class="chat-controls">
             <button id="ai-chat-resize-btn" title="Toggle Size">
@@ -39,14 +41,21 @@
             </button>
         </div>
     </div>
+    <!-- Tab Container -->
+    <div id="chat-tabs-container">
+        <!-- Tabs will be dynamically inserted here -->
+        <button id="chat-new-tab-btn" title="New Chat">+</button>
+    </div>
     <div id="ai-chat-messages">
         <!-- Messages will be dynamically inserted here -->
     </div>
-    <div class="chat-input-area">
-        <input type="text" id="ai-chat-input" placeholder="Ask a question about the PDF...">
-        <button id="ai-chat-send-btn" title="Send Message">
-            <span class="material-symbols-outlined">send</span>
-        </button>
+    <div class="chat-footer">
+        <div class="chat-input-area">
+            <input type="text" id="ai-chat-input" placeholder="Ask a question about the PDF...">
+            <button id="ai-chat-send-btn" title="Send Message">
+                <span class="material-symbols-outlined">send</span>
+            </button>
+        </div>
     </div>
     <!-- Overlay for when the PDF is being processed -->
     <div id="chat-processing-overlay" class="chat-processing-overlay hidden">
