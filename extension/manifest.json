@@ -1,6 +1,6 @@
 {
     "manifest_version": 3,
-    "name": "Scholar PDF Reader with Annotations",
+    "name": "AI Scholar PDF Reader",
     "default_locale": "en",
     "description": "__MSG_1726__",
     "icons": {

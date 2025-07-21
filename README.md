@@ -1,13 +1,11 @@
 # TODO
-1) Adjusting reading speed, UI, backend, etc. 
-2) Update current session price
+1) Add markdown/next lines to the AI answers. 
+2) Adjusting reading speed, UI, backend, etc.
 3) Add go to the reading part
-4) Add markdown/next lines to the AI answers. 
 4) Save the Voices in a local/S3
-5) Change name to google scholar pdf reader with annotations "& TTS & AI"
-10) Make a pull request to the original repo
+5) Make a pull request to the original repo
 
-# Scholar PDF Reader with Annotations
+# AI Scholar PDF Reader
 
 This extension adds annotation capabilities to the Google Scholar PDF Reader extension. The extended features include:
 

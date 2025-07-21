@@ -30,81 +30,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Constants ---
     const VOICE_TIER_DATA = {
-        'Standard': {
-            name: 'Standard',
-            price: 4.00,
-            desc: 'Basic, robotic-sounding synthesis.',
-            freeTier: '4 million',
-            sku: '9D01-5995-B545'
-        },
-        'WaveNet': {
-            name: 'WaveNet',
-            price: 16.00,
-            desc: "High-fidelity, natural-sounding voices.",
-            freeTier: '1 million',
-            sku: 'FEBD-04B6-769B'
-        },
-        'Neural2': {
-            name: 'Neural2',
-            price: 16.00,
-            desc: "Google's next-generation high-fidelity voices.",
-            freeTier: '1 million',
-            sku: 'FEBD-04B6-769B'
-        },
-        'Polyglot': {
-            name: 'Polyglot',
-            price: 16.00,
-            desc: 'Voices designed to speak multiple languages fluently.',
-            freeTier: '1 million',
-            sku: 'FEBD-04B6-769B'
-        },
-        'Chirp 3: HD': {
-            name: 'Chirp 3: HD',
-            price: 30.00,
-            desc: 'High-definition voices for superior audio clarity.',
-            freeTier: '1 million',
-            sku: 'F977-2280-6F1B'
-        },
-        'Instant Custom Voice': {
-            name: 'Instant Custom Voice',
-            price: 60.00,
-            desc: 'Create a unique voice from audio samples.',
-            freeTier: 'N/A',
-            sku: 'A247-37D7-C094'
-        },
-        'Studio': {
-            name: 'Studio',
-            price: 160.00,
-            desc: 'Highest-quality, most expressive voices.',
-            freeTier: '1 million',
-            sku: '84AB-48C0-F9C3'
-        }
+        'Standard': { name: 'Standard', price: 4.00, desc: 'Basic, robotic-sounding synthesis.', freeTier: '4 million', sku: '9D01-5995-B545' },
+        'WaveNet': { name: 'WaveNet', price: 16.00, desc: "High-fidelity, natural-sounding voices.", freeTier: '1 million', sku: 'FEBD-04B6-769B' },
+        'Neural2': { name: 'Neural2', price: 16.00, desc: "Google's next-generation high-fidelity voices.", freeTier: '1 million', sku: 'FEBD-04B6-769B' },
+        'Polyglot': { name: 'Polyglot', price: 16.00, desc: 'Voices designed to speak multiple languages fluently.', freeTier: '1 million', sku: 'FEBD-04B6-769B' },
+        'Chirp 3: HD': { name: 'Chirp 3: HD', price: 30.00, desc: 'High-definition voices for superior audio clarity.', freeTier: '1 million', sku: 'F977-2280-6F1B' },
+        'Studio': { name: 'Studio', price: 160.00, desc: 'Highest-quality, most expressive voices.', freeTier: '1 million', sku: '84AB-48C0-F9C3' }
     };
 
     // --- Utility Functions ---
 
-    /**
-     * Saves a value to the extension's local storage.
-     * @param {string} key The key to save the data under.
-     * @param {any} value The value to save.
-     */
     function setCookie(key, value) {
-        chrome.storage.local.set({ [key]: value }, () => {
-            console.log(`Setting saved: ${key} =`, value);
-        });
+        chrome.storage.local.set({ [key]: value });
     }
 
-    /**
-     * Retrieves a setting from chrome.storage.local using a modern async/await pattern.
-     * This is the recommended replacement for a synchronous getCookie() function.
-     *
-     * @param {string} key The key of the setting you want to retrieve.
-     * @returns {Promise<any>} A promise that resolves with the stored value, or undefined if not found.
-     */
     function getCookie(key) {
         return new Promise((resolve) => {
             chrome.storage.local.get([key], (result) => {
-                console.log(`Retrieved: ${key} =`, result[key]);
                 resolve(result[key]);
             });
         });
@@ -121,42 +63,42 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const getFlagEmoji = (countryCode) => {
         if (!countryCode) return '🌐';
-        const codePoints = countryCode
-            .toUpperCase()
-            .split('')
-            .map(char => 127397 + char.charCodeAt());
+        const codePoints = countryCode.toUpperCase().split('').map(char => 127397 + char.charCodeAt());
         return String.fromCodePoint(...codePoints);
     };
 
     const showStatus = (message, type = 'info') => {
         elements.status.textContent = message;
-        elements.status.className = type; // 'success', 'error', or 'info'
-        // Automatically hide after 5 seconds
+        elements.status.className = `status ${type}`;
+        elements.status.style.display = 'block';
         setTimeout(() => {
-            elements.status.className = '';
+            elements.status.style.display = 'none';
         }, 5000);
     };
 
     // --- Core Functions ---
 
+    const loadAndDisplayUsage = async () => {
+        const totalCost = await getCookie('totalTtsCost') || 0;
+        elements.totalUsageDisplay.textContent = `$${parseFloat(totalCost).toFixed(3)}`;
+    };
+
     const loadSettings = async () => {
         const apiKey = await getCookie('googleTtsApiKey');
         const voiceName = await getCookie('selectedVoiceName');
         const language = await getCookie('selectedLanguage');
-        const totalUsage = await getCookie('totalApiCost') || 0;
 
         if (voiceName) {
             state.selectedVoiceName = voiceName;
         }
 
-        elements.totalUsageDisplay.textContent = `$${parseFloat(totalUsage).toFixed(6)}`;
-
         if (apiKey) {
             elements.apiKeyInput.value = apiKey;
             elements.languageSelect.value = language || 'en-US';
             state.apiKey = apiKey;
-            await validateApiKey(false); // Validate without showing initial status message
+            await validateApiKey(false);
         }
+        loadAndDisplayUsage(); // Initial load
     };
 
     const validateApiKey = async (showAlerts = true) => {
@@ -169,7 +111,6 @@ document.addEventListener('DOMContentLoaded', () => {
         elements.validateKeyBtn.disabled = true;
 
         try {
-            console.log('Validating API Key...', apiKey);
             const response = await fetch(`https://texttospeech.googleapis.com/v1/voices?key=${apiKey}`);
             const data = await response.json();
             if (!response.ok || !data.voices) throw new Error(data.error?.message || 'Invalid API Key.');
@@ -180,6 +121,7 @@ document.addEventListener('DOMContentLoaded', () => {
             state.allVoices = data.voices;
             elements.voiceSelectionContainer.style.display = 'block';
             elements.languageSelectWrapper.style.display = 'block';
+            elements.totalUsageContainer.style.display = 'flex';
             await populateLanguageSelector();
             renderVoiceTiers();
         } catch (error) {
@@ -219,7 +161,6 @@ document.addEventListener('DOMContentLoaded', () => {
         elements.languageSelectWrapper.style.display = 'block';
         elements.languageSelectLabel.style.display = 'block';
         elements.saveVoiceBtnContainer.style.display = 'flex';
-        elements.totalUsageContainer.style.display = 'flex';
 
         const sortedLanguages = [...languageMap.values()].sort((a, b) => a.name.localeCompare(b.name));
         elements.languageSelect.innerHTML = '';
@@ -294,4 +235,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Initialization ---
     loadSettings();
+    // Set an interval to refresh the usage display every 10 seconds
+    setInterval(loadAndDisplayUsage, 10000);
 });

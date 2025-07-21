@@ -13,6 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
         saveModelBtn: document.getElementById('save-gemini-model-btn'),
         status: document.getElementById('status'), // Re-using the general status element
         geminiUsageContainer: document.getElementById('total-gemini-usage-container'),
+        totalUsageDisplay: document.getElementById('total-usage-gemini'),
     };
 
     // --- State ---
@@ -22,26 +23,47 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // --- Constants ---
-    // Pricing based on per 1 million tokens as provided.
-    // The UI will display this pricing information directly.
+    // Pricing based on per 1 million tokens.
+    // This structure now supports different prices for different input modalities.
     const GEMINI_MODELS_DATA = {
         'gemini-2.5-pro': {
             name: 'Gemini 2.5 Pro',
             desc: 'Most capable model for highly complex tasks. Larger context window.',
-            inputPrice: 1.25,
-            outputPrice: 10.00,
+            pricing: {
+                input: {
+                    text: 1.25, // Price per 1M tokens for text
+                    document: 1.25 // Placeholder price for documents
+                },
+                output: {
+                    text: 10.00 // Price per 1M tokens for text output
+                }
+            }
         },
         'gemini-2.5-flash': {
             name: 'Gemini 2.5 Flash',
             desc: 'Fast and cost-effective model for multi-modal reasoning.',
-            inputPrice: 0.30,
-            outputPrice: 2.50,
+            pricing: {
+                input: {
+                    text: 0.30, // Price per 1M tokens for text
+                    document: 0.30 // XX - Using your requested placeholder price for documents
+                },
+                output: {
+                    text: 2.50 // Price per 1M tokens for text output
+                }
+            }
         },
         'gemini-2.5-flash-lite-preview-06-17': {
             name: 'Gemini 2.5 Flash-Lite (Preview)',
             desc: 'A lighter, faster preview model for quick tasks.',
-            inputPrice: 0.10,
-            outputPrice: 0.40,
+            pricing: {
+                input: {
+                    text: 0.10,
+                    document: 0.10 // Placeholder price for documents
+                },
+                output: {
+                    text: 0.40
+                }
+            }
         }
     };
 
@@ -91,6 +113,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Core Functions ---
 
     /**
+     * Loads and displays the total usage cost from storage.
+     */
+    const loadAndDisplayUsage = async () => {
+        const totalCost = await getStorage('totalGeminiCost') || 0;
+        elements.totalUsageDisplay.textContent = `$${parseFloat(totalCost).toFixed(3)}`;
+    };
+
+    /**
      * Loads saved settings from storage when the page loads.
      */
     const loadSettings = async () => {
@@ -106,6 +136,7 @@ document.addEventListener('DOMContentLoaded', () => {
             state.apiKey = apiKey;
             await validateApiKey(false); // Validate on load without showing status
         }
+        loadAndDisplayUsage(); // Initial load
     };
 
     /**
@@ -122,7 +153,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (showAlerts) showStatus('Validating key...', 'success');
         elements.validateKeyBtn.disabled = true;
 
-        // Use the cheapest model for validation to save costs
         const validationModel = 'gemini-2.5-flash';
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${validationModel}:generateContent?key=${apiKey}`;
 
@@ -132,9 +162,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     contents: [{ role: 'user', parts: [{ text: 'Hello' }] }],
-                    generationConfig: {
-                        maxOutputTokens: 1 // Limit to 1 token for a cheap request
-                    }
+                    generationConfig: { maxOutputTokens: 1 }
                 }),
             });
 
@@ -184,7 +212,13 @@ document.addEventListener('DOMContentLoaded', () => {
         Object.keys(GEMINI_MODELS_DATA).forEach(modelKey => {
             const modelInfo = GEMINI_MODELS_DATA[modelKey];
             const card = document.createElement('div');
-            card.className = 'voice-tier-card'; // Re-using TTS styles for consistency
+            card.className = 'voice-tier-card';
+
+            // Build pricing details string
+            const inputPricingText = Object.entries(modelInfo.pricing.input)
+                .map(([modality, price]) => `<strong>${modality.charAt(0).toUpperCase() + modality.slice(1)}:</strong> $${price.toFixed(2)}`)
+                .join(', ');
+            const outputPricingText = `<strong>Text:</strong> $${modelInfo.pricing.output.text.toFixed(2)}`;
 
             card.innerHTML = `
                 <div class="tier-header">
@@ -192,8 +226,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
                 <p class="tier-desc">${modelInfo.desc}</p>
                 <div class="tier-details">
-                    <span><strong>Input:</strong> $${modelInfo.inputPrice.toFixed(2)} / 1M tokens</span>
-                    <span><strong>Output:</strong> $${modelInfo.outputPrice.toFixed(2)} / 1M tokens</span>
+                    <span><strong>Input:</strong> ${inputPricingText} / 1M tokens</span>
+                    <span><strong>Output:</strong> ${outputPricingText} / 1M tokens</span>
                 </div>
                 <div class="mt-3">
                     <label class="voice-option">
@@ -229,4 +263,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Initialization ---
     loadSettings();
+    // Set an interval to refresh the usage display every 10 seconds
+    setInterval(loadAndDisplayUsage, 10000);
 });

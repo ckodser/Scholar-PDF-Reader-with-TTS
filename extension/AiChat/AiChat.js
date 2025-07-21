@@ -16,6 +16,29 @@ let aiChatState = {
     activeTabId: null,
 };
 
+// --- Pricing Data (Mirrored from gemini_settings.js for direct access) ---
+const GEMINI_MODELS_DATA = {
+    'gemini-2.5-pro': {
+        pricing: {
+            input: { text: 1.25, document: 1.25 },
+            output: { text: 10.00 }
+        }
+    },
+    'gemini-2.5-flash': {
+        pricing: {
+            input: { text: 0.30, document: 0.30 },
+            output: { text: 2.50 }
+        }
+    },
+    'gemini-2.5-flash-lite-preview-06-17': {
+        pricing: {
+            input: { text: 0.10, document: 0.10 },
+            output: { text: 0.40 }
+        }
+    }
+};
+
+
 // --- DOM Element References ---
 const dom = {};
 
@@ -200,8 +223,14 @@ async function handleSendMessage() {
     dom.chatMessages.scrollTop = dom.chatMessages.scrollHeight;
 
     try {
-        const responseText = await callGeminiAPI(activeTab.conversation);
+        const responseData = await callGeminiAPI(activeTab.conversation);
+        const responseText = responseData.candidates[0].content.parts[0].text;
+
         activeTab.conversation.push({ role: 'model', parts: [{ text: responseText }] });
+
+        // Record usage after a successful call
+        await recordGeminiUsage(responseData);
+
         thinkingMessage.remove();
         renderMessage('ai', responseText);
     } catch (error) {
@@ -225,8 +254,61 @@ async function callGeminiAPI(history) {
     if (!response.ok || !data.candidates) {
         throw new Error(data.error?.message || 'Unknown API error.');
     }
-    return data.candidates[0].content.parts[0].text;
+    return data;
 }
+
+/**
+ * Calculates the cost of a Gemini API call and adds it to the total in storage.
+ * @param {object} responseData The full response object from the Gemini API.
+ */
+async function recordGeminiUsage(responseData) {
+    if (!responseData.usageMetadata) {
+        console.warn("No usageMetadata found in response. Cannot calculate cost.");
+        return;
+    }
+
+    const { usageMetadata } = responseData;
+    const modelUsed = aiChatState.model; // Or responseData.modelVersion if you want to be precise
+    const modelPricing = GEMINI_MODELS_DATA[modelUsed]?.pricing;
+
+    if (!modelPricing) {
+        console.error(`Pricing not found for model: ${modelUsed}`);
+        return;
+    }
+
+    let inputCost = 0;
+    // The API now provides promptTokensDetails, which is more accurate.
+    if (usageMetadata.promptTokensDetails) {
+        usageMetadata.promptTokensDetails.forEach(detail => {
+            const modality = detail.modality.toLowerCase();
+            const price = modelPricing.input[modality];
+            if (price !== undefined) {
+                inputCost += (detail.tokenCount / 1000000) * price;
+            } else {
+                console.warn(`No input price defined for modality: ${modality}`);
+            }
+        });
+    } else {
+        // Fallback to promptTokenCount if details are not available
+        const price = modelPricing.input.text; // Assume text if no details
+        inputCost = (usageMetadata.promptTokenCount / 1000000) * price;
+    }
+
+
+    const outputCost = (usageMetadata.candidatesTokenCount / 1000000) * modelPricing.output.text;
+
+    const callCost = inputCost + outputCost;
+
+    try {
+        const currentTotal = await getStorage('totalGeminiCost') || 0;
+        const newTotal = currentTotal + callCost;
+        chrome.storage.local.set({ totalGeminiCost: newTotal });
+        console.log(`Recorded Gemini cost: $${callCost.toFixed(6)}. New total: $${newTotal.toFixed(6)}`);
+    } catch (error) {
+        console.error("Failed to record Gemini usage:", error);
+    }
+}
+
 
 // --- Initialization ---
 
@@ -242,7 +324,8 @@ async function initializeAiChat() {
         dom.chatActivateBtn.classList.remove('hidden');
         dom.aiChatBorder.classList.remove('hidden');
         if (dom.headerTitle) {
-            dom.headerTitle.textContent = aiChatState.model;
+            const modelData = GEMINI_MODELS_DATA[aiChatState.model];
+            dom.headerTitle.textContent = modelData ? modelData.name : aiChatState.model;
         }
     } else {
         dom.chatPanel.classList.add('hidden');

@@ -5,35 +5,60 @@ let ttsState = {
     isSpeaking: false,
     isPaused: false,
     audioCache: new Map(),
-    // We'll get these from cookies/storage later
     selectedVoiceName: 'en-US-Wavenet-D',
     apiKey: '',
 };
 
+// --- Pricing Data (Mirrored from tts_settings.js for direct access) ---
+const VOICE_TIER_DATA = {
+    'Standard': { price: 4.00 },
+    'WaveNet': { price: 16.00 },
+    'Neural2': { price: 16.00 },
+    'Polyglot': { price: 16.00 },
+    'Chirp 3: HD': { price: 30.00 },
+    'Instant Custom Voice': { price: 60.00 },
+    'Studio': { price: 160.00 }
+};
+
 const pdfUrlToTextData = new Map();
 
-/// Use PDF.Js by Mozila
+// --- Utility Functions (including helpers from settings) ---
+function getCookie(key) {
+    return new Promise((resolve) => {
+        chrome.storage.local.get([key], (result) => {
+            resolve(result[key]);
+        });
+    });
+}
 
-/**
- * Fetches and parses a PDF page using PDF.js, returning its text content.
- * Caches results to avoid re-fetching the same PDF.
- *
- * @param {string} pdfUrl - The URL of the PDF.
- * @param {number} pageNum - The 1-based page number.
- * @returns {Promise<Array<Object>>} A promise that resolves with an array of PDF.js text items.
- */
+const getVoiceTier = (voiceName) => {
+    if (voiceName.includes('Studio')) return 'Studio';
+    if (voiceName.includes('Neural2')) return 'Neural2';
+    if (voiceName.includes('Wavenet')) return 'WaveNet';
+    if (voiceName.includes('Polyglot')) return 'Polyglot';
+    if (voiceName.includes('Chirp')) return 'Chirp 3: HD';
+    return 'Standard';
+};
+
+async function stringToHashAsync(str) {
+    const textAsBuffer = new TextEncoder().encode(str);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', textAsBuffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+
+/// Use PDF.Js by Mozila
 async function getPdfTextData(pdfUrl, pageNum) {
     const cacheKey = `${pdfUrl}-page-${pageNum}`;
     if (pdfUrlToTextData.has(cacheKey)) {
         return pdfUrlToTextData.get(cacheKey);
     }
-
     try {
         const loadingTask = pdfjsLib.getDocument(pdfUrl);
         const pdf = await loadingTask.promise;
         const page = await pdf.getPage(pageNum);
         const textContent = await page.getTextContent();
-
         pdfUrlToTextData.set(cacheKey, textContent.items);
         return textContent.items;
     } catch (error) {
@@ -42,82 +67,39 @@ async function getPdfTextData(pdfUrl, pageNum) {
     }
 }
 
-
-
-
-
-/**
- * Processes a rendered page to extract sentences for TTS.
- * This version uses a corrected TreeWalker filter.
- *
- * @param {HTMLElement} pageElement The .gsr-page element containing the content.
- */
 async function processPageForTTS(pageElement, pdfUrl, pageNum) {
-    console.log(`Processing Page ${pageNum} for URL: ${pdfUrl}`);
-
-    // --- 1. Get Text Data from PDF.js (from cache or by fetching) ---
     const pdfTextItems = await getPdfTextData(pdfUrl, pageNum);
-    if (!pdfTextItems || pdfTextItems.length === 0) {
-        console.log(`No text data from PDF.js for page ${pageNum}.`);
-        return;
-    }
-     const pdfRawText = pdfTextItems.map(item => item.str).join(' ');
-
-
+    if (!pdfTextItems || pdfTextItems.length === 0) return;
+    const pdfRawText = pdfTextItems.map(item => item.str).join(' ');
     const textContainer = pageElement.querySelector('.gsr-text-ctn');
-    if (!textContainer) {
-        console.error("Could not find '.gsr-text-ctn' in page element:", pageElement);
-        return;
-    }
+    if (!textContainer) return;
 
-    // --- 1. Collect all text-containing elements with a corrected filter ---
     const walker = document.createTreeWalker(textContainer, NodeFilter.SHOW_ELEMENT, {
         acceptNode: (node) => {
-            // We accept a node if it's visible and contains text, but has no other ELEMENT children.
-            // This correctly finds the "lowest-level" spans/divs that hold the actual text.
             const isVisible = node.offsetParent !== null;
             const hasText = node.textContent.trim() !== '';
-            const hasNoElementChildren = !node.querySelector('*'); // Check if it has any element children
-
-            if (isVisible && hasText && hasNoElementChildren) {
-                return NodeFilter.FILTER_ACCEPT;
-            }
-            return NodeFilter.FILTER_REJECT;
+            const hasNoElementChildren = !node.querySelector('*');
+            return (isVisible && hasText && hasNoElementChildren) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
         }
     });
 
     const elements = [];
-    while (walker.nextNode()) {
-        elements.push(walker.currentNode);
-    }
+    while (walker.nextNode()) elements.push(walker.currentNode);
+    if (elements.length === 0) return;
 
-    // Your check is perfect here.
-    if (elements.length === 0) {
-        console.log('No text elements found on this page, skipping...');
-        return;
-    }
-
-
-
-    // --- 3. Split the full text into sentences ---
     const sentenceStrings = pdfRawText.split(/(?<=[.?!])\s+/).filter(s => s.trim());
-
-    // --- 4. Map sentence strings back to the original elements ---
     let elementCursor = 0;
     let elementCharCursor = 0;
+
     sentenceStrings.forEach(sentenceText => {
         sentenceText = sentenceText.trim();
         if (sentenceText.length === 0) return;
 
-        console.log(`Sentence Text: ${sentenceText}`);
         const sentenceElements = new Set();
-
         for (let i = 0; i < sentenceText.length; i++) {
-            if (sentenceText[i] === ' ') {continue;}
-            let jumping = '';
+            if (sentenceText[i] === ' ') continue;
             while (elementCursor < elements.length) {
-                if (elementCharCursor < elements[elementCursor].textContent.length){
-                    jumping = jumping + elements[elementCursor].textContent[elementCharCursor];
+                if (elementCharCursor < elements[elementCursor].textContent.length) {
                     if (elements[elementCursor].textContent[elementCharCursor] === sentenceText[i]) {
                         sentenceElements.add(elements[elementCursor]);
                         elementCharCursor++;
@@ -134,18 +116,7 @@ async function processPageForTTS(pageElement, pdfUrl, pageNum) {
         const sentenceSpans = Array.from(sentenceElements);
         if (sentenceSpans.length > 0) {
             const sentenceIndex = ttsState.sentences.length;
-            const newSentence = {
-                text: sentenceText,
-                spans: sentenceSpans,
-                index: sentenceIndex
-            };
-            ttsState.sentences.push(newSentence);
-
-            // --- 5. DEBUGGING: Log and highlight the found sentence ---
-            console.log(`%c[TTS Sentence ${sentenceIndex}]:`, 'color: blue; font-weight: bold;', sentenceText);
-            // debugHighlight(sentenceSpans);
-
-
+            ttsState.sentences.push({ text: sentenceText, spans: sentenceSpans, index: sentenceIndex });
             sentenceSpans.forEach(span => {
                 span.addEventListener('click', (e) => {
                     if (!window.colorPickerManagerInstance.activeTools.isHighlighting && !window.colorPickerManagerInstance.activeTools.isErasing && ttsState.isEnabled) {
@@ -159,80 +130,33 @@ async function processPageForTTS(pageElement, pdfUrl, pageNum) {
 }
 
 
-/**
- * DEBUGGING HELPER: Applies a random background color to a set of elements.
- * @param {HTMLElement[]} elements - The array of elements to highlight.
- */
-function debugHighlight(elements) {
-    // Generate a random, light, semi-transparent color for highlighting
-    const r = Math.floor(Math.random() * 155) + 100; // 100-255
-    const g = Math.floor(Math.random() * 155) + 100; // 100-255
-    const b = Math.floor(Math.random() * 155) + 100; // 100-255
-    const randomColor = `rgba(${r}, ${g}, ${b}, 0.5)`;
-
-    elements.forEach(el => {
-        el.style.backgroundColor = randomColor;
-        el.style.cursor = 'pointer'; // Make it obvious it's clickable
-    });
-}
-
-
 // --- Playback Controls ---
 function activateTTS() {
-    const btnPrev = document.getElementById('tts-prev-btn');
-    const btnPlay = document.getElementById('tts-play-btn');
-    const btnPause = document.getElementById('tts-pause-btn');
-    const btnStop = document.getElementById('tts-stop-btn');
-    const btnNext = document.getElementById('tts-next-btn');
-    const activateText = document.getElementById('tts-activate-btn-text');
-    const ttsActivateBtn = document.getElementById('tts-activate-btn');
-    if(ttsState.isEnabled){
-        // Deactivate
-        ttsState.isEnabled = false;
-
-        btnPrev.classList.toggle('hidden', true);
-        btnPlay.classList.toggle('hidden', true);
-        btnPause.classList.toggle('hidden', true);
-        btnStop.classList.toggle('hidden', true);
-        btnNext.classList.toggle('hidden', true);
-        activateText.textContent = "volume_up";
-        ttsActivateBtn.dataset.tooltip = "Activate TTS";
-    }else {
-        //Activate
-        ttsState.isEnabled = true;
-
-        btnPrev.classList.toggle('hidden', false);
-        btnPlay.classList.toggle('hidden', false);
-        btnPause.classList.toggle('hidden', true);
-        btnStop.classList.toggle('hidden', true);
-        btnNext.classList.toggle('hidden', false);
-        activateText.textContent = "volume_off";
-        ttsActivateBtn.dataset.tooltip = "Deactivate TTS";
-    }
+    const isEnabled = !ttsState.isEnabled;
+    ttsState.isEnabled = isEnabled;
+    document.getElementById('tts-prev-btn').classList.toggle('hidden', !isEnabled);
+    document.getElementById('tts-play-btn').classList.toggle('hidden', !isEnabled);
+    document.getElementById('tts-pause-btn').classList.toggle('hidden', true); // Always hide initially
+    document.getElementById('tts-stop-btn').classList.toggle('hidden', true); // Always hide initially
+    document.getElementById('tts-next-btn').classList.toggle('hidden', !isEnabled);
+    document.getElementById('tts-activate-btn-text').textContent = isEnabled ? "volume_off" : "volume_up";
+    document.getElementById('tts-activate-btn').dataset.tooltip = isEnabled ? "Deactivate TTS" : "Activate TTS";
+    if (!isEnabled) stop();
 }
-
 
 function play() {
     if (!ttsState.sentences.length || (ttsState.isSpeaking && !ttsState.isPaused)) return;
-
-    const btnActivate = document.getElementById('tts-activate-btn');
-    const btnStop = document.getElementById('tts-stop-btn');
-    btnActivate.classList.toggle('hidden', true);
-    btnStop.classList.toggle('hidden', false);
+    document.getElementById('tts-activate-btn').classList.add('hidden');
+    document.getElementById('tts-stop-btn').classList.remove('hidden');
 
     if (ttsState.isPaused) {
-        // Resume logic here (for both Google API and browser)
-        if (ttsState.apiKey && ttsState.globalAudioElement) {
-            ttsState.globalAudioElement.play();
-        } else {
-            window.speechSynthesis.resume();
-        }
+        if (ttsState.apiKey && ttsState.globalAudioElement) ttsState.globalAudioElement.play();
+        else window.speechSynthesis.resume();
         ttsState.isPaused = false;
         ttsState.isSpeaking = true;
         updatePlaybackUI();
         return;
     }
-
     ttsState.isSpeaking = true;
     ttsState.isPaused = false;
     updatePlaybackUI();
@@ -241,22 +165,16 @@ function play() {
 
 function pause() {
     if (ttsState.isSpeaking && !ttsState.isPaused) {
-        if (ttsState.apiKey && ttsState.globalAudioElement) {
-            ttsState.globalAudioElement.pause();
-        } else {
-            window.speechSynthesis.pause();
-        }
+        if (ttsState.apiKey && ttsState.globalAudioElement) ttsState.globalAudioElement.pause();
+        else window.speechSynthesis.pause();
         ttsState.isPaused = true;
         updatePlaybackUI();
     }
 }
 
 function stop() {
-    const btnActivate = document.getElementById('tts-activate-btn');
-    const btnStop = document.getElementById('tts-stop-btn');
-    btnActivate.classList.toggle('hidden', false);
-    btnStop.classList.toggle('hidden', true);
-
+    document.getElementById('tts-activate-btn').classList.remove('hidden');
+    document.getElementById('tts-stop-btn').classList.add('hidden');
     window.speechSynthesis.cancel();
     if (ttsState.globalAudioElement) {
         ttsState.globalAudioElement.pause();
@@ -269,17 +187,12 @@ function stop() {
     updatePlaybackUI();
 }
 
-function nextSentence() {
-    jumpToSentenceAndPlay(ttsState.currentSentenceIndex + 1);
-}
-
-function previousSentence() {
-    jumpToSentenceAndPlay(ttsState.currentSentenceIndex - 1);
-}
+function nextSentence() { jumpToSentenceAndPlay(ttsState.currentSentenceIndex + 1); }
+function previousSentence() { jumpToSentenceAndPlay(ttsState.currentSentenceIndex - 1); }
 
 function jumpToSentenceAndPlay(index) {
     if (index < 0 || index >= ttsState.sentences.length) return;
-    stop(); // Stop current playback
+    stop();
     ttsState.currentSentenceIndex = index;
     play();
 }
@@ -291,33 +204,18 @@ async function speakSentence() {
         stop();
         return;
     }
-
     const sentence = ttsState.sentences[ttsState.currentSentenceIndex];
-    const textToSpeak = sentence.text; // Add filtering logic here if needed
-
     highlightSentence(sentence.spans);
 
     if (ttsState.apiKey) {
-        const preCachePromises = [];
-        for(let i = 1; i <= 3 && i+ttsState.currentSentenceIndex<ttsState.sentences.length; i++) {
-            if (ttsState.sentences[ttsState.currentSentenceIndex + i]) {
-                preCachePromises.push(
-                    speakWithGoogleApi(ttsState.sentences[ttsState.currentSentenceIndex + i].text, false)
-                );
-            }
+        // Pre-cache next few sentences
+        for (let i = 1; i <= 3 && (ttsState.currentSentenceIndex + i) < ttsState.sentences.length; i++) {
+            const nextSentence = ttsState.sentences[ttsState.currentSentenceIndex + i];
+            speakWithGoogleApi(nextSentence.text, false).catch(e => console.error("Pre-cache failed:", e));
         }
-
-        // Handle any potential errors from the pre-caching calls
-        // This removes the "floating promise" warning
-        Promise.all(preCachePromises).catch(error => {
-            console.error("Failed to pre-cache a sentence:", error);
-        });
-
-
-        await speakWithGoogleApi(textToSpeak, true);
+        await speakWithGoogleApi(sentence.text, true);
     } else {
-        console.log('Using browser TTS', ttsState.apiKey);
-        speakWithBrowserApi(textToSpeak);
+        speakWithBrowserApi(sentence.text);
     }
 }
 
@@ -343,128 +241,101 @@ function playAudio(url) {
     };
 }
 
+/**
+ * Calculates and records the cost of a TTS synthesis request.
+ * @param {number} characterCount - The number of characters being synthesized.
+ */
+async function recordTtsUsage(characterCount) {
+    const tierKey = getVoiceTier(ttsState.selectedVoiceName);
+    const tierPricing = VOICE_TIER_DATA[tierKey];
+
+    if (!tierPricing) {
+        console.error(`Could not find pricing for voice tier: ${tierKey}`);
+        return;
+    }
+
+    const cost = (characterCount / 1000000) * tierPricing.price;
+
+    try {
+        const currentTotal = await getCookie('totalTtsCost') || 0;
+        const newTotal = currentTotal + cost;
+        chrome.storage.local.set({ totalTtsCost: newTotal });
+        console.log(`Recorded TTS cost: $${cost.toFixed(6)}. New total: $${newTotal.toFixed(6)}`);
+    } catch (error) {
+        console.error("Failed to record TTS usage:", error);
+    }
+}
+
 async function generateAudioFromGoogle(text, cacheKey) {
+    // Record usage BEFORE making the call
+    await recordTtsUsage(text.length);
+
     try {
         const response = await fetch(`https://texttospeech.googleapis.com/v1/text:synthesize?key=${ttsState.apiKey}`, {
             method: 'POST',
             body: JSON.stringify({
-                input: {text: text},
-                voice: {languageCode: ttsState.selectedVoiceName.substring(0, 5), name: ttsState.selectedVoiceName},
-                audioConfig: {audioEncoding: 'MP3'}
+                input: { text: text },
+                voice: { languageCode: ttsState.selectedVoiceName.substring(0, 5), name: ttsState.selectedVoiceName },
+                audioConfig: { audioEncoding: 'MP3' }
             })
         });
-
         if (!response.ok) throw new Error(`Google TTS Error: ${(await response.json()).error.message}`);
-
         const data = await response.json();
-        const audioBlob = new Blob([Uint8Array.from(atob(data.audioContent), c => c.charCodeAt(0))], {type: 'audio/mp3'});
+        const audioBlob = new Blob([Uint8Array.from(atob(data.audioContent), c => c.charCodeAt(0))], { type: 'audio/mp3' });
         const localUrl = URL.createObjectURL(audioBlob);
-
-        ttsState.audioCache.set(cacheKey, localUrl); // Cache for this session
-        // For persistence, you could save this to chrome.storage.local
+        ttsState.audioCache.set(cacheKey, localUrl);
         return localUrl;
     } catch (error) {
         console.error(error);
+        stop(); // Stop playback on API error
         return null;
     }
 }
 
 async function speakWithGoogleApi(text, read_aloud) {
-    // This is the key part adapted for a client-side extension
-    console.log('Using Google API for TTS');
     const cacheKey = `${await stringToHashAsync(text)}-${ttsState.selectedVoiceName}`;
     const cachedAudio = ttsState.audioCache.get(cacheKey);
 
     if (cachedAudio) {
-        if (read_aloud) {
-            playAudio(cachedAudio);
-        }
+        if (read_aloud) playAudio(cachedAudio);
         return;
     }
 
-    // Fetch from Google TTS API
     const localUrl = await generateAudioFromGoogle(text, cacheKey);
     if (localUrl && read_aloud) playAudio(localUrl);
 }
 
-// --- UI Helper Functions (can be in a separate tts_ui.js) ---
-
+// --- UI Helper Functions ---
 function updatePlaybackUI() {
-    const playBtn = document.getElementById('tts-play-btn');
-    const pauseBtn = document.getElementById('tts-pause-btn');
-
-    playBtn.classList.toggle('hidden', ttsState.isSpeaking && !ttsState.isPaused);
-    pauseBtn.classList.toggle('hidden', !ttsState.isSpeaking || ttsState.isPaused);
+    document.getElementById('tts-play-btn').classList.toggle('hidden', ttsState.isSpeaking && !ttsState.isPaused);
+    document.getElementById('tts-pause-btn').classList.toggle('hidden', !ttsState.isSpeaking || ttsState.isPaused);
 }
-
 function highlightSentence(spans) {
     clearHighlight();
     spans.forEach(span => span.classList.add('tts-highlight'));
-    spans[0].scrollIntoView({behavior: 'smooth', block: 'center'});
+    if (spans[0]) spans[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
-
 function clearHighlight() {
     document.querySelectorAll('.tts-highlight').forEach(el => el.classList.remove('tts-highlight'));
 }
 
-/**
- * Hashes a string using the fast and non-blocking Web Crypto API (SHA-256).
- * This is the recommended replacement for the slow, synchronous JavaScript loop.
- *
- * @param {string} str The string to hash.
- * @returns {Promise<string>} A promise that resolves with the hex string representation of the hash.
- */
-async function stringToHashAsync(str) {
-    // 1. Encode the string into a byte array.
-    const textAsBuffer = new TextEncoder().encode(str);
-
-    // 2. Use the Web Crypto API to hash the byte array.
-    const hashBuffer = await crypto.subtle.digest('SHA-256', textAsBuffer);
-
-    // 3. Convert the resulting ArrayBuffer to a hexadecimal string.
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-
-    return hashHex;
-}
-
-
+// --- Initialization ---
 async function initializeTTS() {
     console.log('Initializing TTS...');
-
     document.getElementById('tts-play-btn').addEventListener('click', play);
     document.getElementById('tts-pause-btn').addEventListener('click', pause);
     document.getElementById('tts-stop-btn').addEventListener('click', stop);
     document.getElementById('tts-next-btn').addEventListener('click', nextSentence);
     document.getElementById('tts-prev-btn').addEventListener('click', previousSentence);
     document.getElementById('tts-activate-btn').addEventListener('click', activateTTS);
-    // Your tts_settings.js saves to cookies, so we can read from there.
-    /**
-     * Retrieves a setting from chrome.storage.local using a modern async/await pattern.
-     * This is the recommended replacement for a synchronous getCookie() function.
-     *
-     * @param {string} key The key of the setting you want to retrieve.
-     * @returns {Promise<any>} A promise that resolves with the stored value, or undefined if not found.
-     */
-    function getCookie(key) {
-        return new Promise((resolve) => {
-            chrome.storage.local.get([key], (result) => {
-                console.log(`Retrieved: ${key} =`, result[key]);
-                resolve(result[key]);
-            });
-        });
-    }
 
     ttsState.apiKey = await getCookie('googleTtsApiKey');
-    console.log('Google TTS API key:', ttsState.apiKey);
     const savedVoice = await getCookie('selectedVoiceName');
     if (savedVoice) ttsState.selectedVoiceName = savedVoice;
-    if (ttsState.apiKey){
-        const btnActivate = document.getElementById('tts-activate-btn');
-        btnActivate.classList.toggle('hidden', false);
 
-        const ttsBorder = document.getElementById('tts-border');
-        ttsBorder.classList.toggle('hidden', false);
+    if (ttsState.apiKey) {
+        document.getElementById('tts-activate-btn').classList.remove('hidden');
+        document.getElementById('tts-border').classList.remove('hidden');
     }
 }
 
