@@ -1,13 +1,9 @@
 /**
- * settings.js
- * * Handles all logic for the settings page, including API key validation,
- * voice selection, and loading/saving settings via cookies to be consistent
- * with the main application.
+ * tts_settings.js
+ * Handles all logic for the settings page, including API key validation,
+ * voice selection, and loading/saving settings.
  */
-
-console.log('TTS Settings Page');
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('TTS Settings Page2 - DOMContentLoaded');
     // --- DOM Elements ---
     const elements = {
         apiKeyInput: document.getElementById('api-key-input'),
@@ -17,6 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
         voiceSelectionContainer: document.getElementById('voice-selection-container'),
         languageSelect: document.getElementById('language-select'),
         languageSelectLabel: document.getElementById('language-select-label'),
+        languageSelectWrapper: document.getElementById('language-select-wrapper'),
         saveVoiceBtnContainer: document.getElementById('save-voice-btn-container'),
         totalUsageContainer: document.getElementById('total-usage-container'),
         voiceTierContainer: document.getElementById('voice-tier-container'),
@@ -168,33 +165,26 @@ document.addEventListener('DOMContentLoaded', () => {
             if (showAlerts) showStatus('Please enter an API key.', 'error');
             return;
         }
-
-        if (showAlerts) showStatus('Validating key...', 'info');
+        if (showAlerts) showStatus('Validating key...', 'success');
         elements.validateKeyBtn.disabled = true;
 
         try {
             console.log('Validating API Key...', apiKey);
             const response = await fetch(`https://texttospeech.googleapis.com/v1/voices?key=${apiKey}`);
             const data = await response.json();
+            if (!response.ok || !data.voices) throw new Error(data.error?.message || 'Invalid API Key.');
 
-            if (response.ok && data.voices) {
-                if (showAlerts) showStatus('API Key is valid!', 'success');
-                state.apiKey = apiKey;
-                setCookie('googleTtsApiKey', apiKey);
-                state.allVoices = data.voices;
-
-                elements.voiceSelectionContainer.style.display = 'block';
-                elements.validateKeyBtn.disabled = false;
-
-                await populateLanguageSelector();
-                renderVoiceTiers();
-            } else {
-                throw new Error(data.error?.message || 'Invalid API Key or configuration.');
-            }
+            if (showAlerts) showStatus('API Key is valid!', 'success');
+            state.apiKey = apiKey;
+            setCookie('googleTtsApiKey', apiKey);
+            state.allVoices = data.voices;
+            elements.voiceSelectionContainer.style.display = 'block';
+            await populateLanguageSelector();
+            renderVoiceTiers();
         } catch (error) {
-            console.error('API Key validation error:', error);
             if (showAlerts) showStatus(`Error: ${error.message}`, 'error');
             elements.voiceSelectionContainer.style.display = 'none';
+        } finally {
             elements.validateKeyBtn.disabled = false;
         }
     };
@@ -202,10 +192,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const clearApiKey = () => {
         elements.apiKeyInput.value = '';
         state.apiKey = '';
-        setCookie('googleTtsApiKey', '', -1); // Expire the cookie
+        chrome.storage.local.remove('googleTtsApiKey');
         elements.voiceSelectionContainer.style.display = 'none';
         state.allVoices = [];
-        showStatus('API Key removed.', 'info');
+        showStatus('API Key removed.', 'success');
     };
 
     const populateLanguageSelector = async () => {
@@ -214,23 +204,23 @@ document.addEventListener('DOMContentLoaded', () => {
             voice.languageCodes.forEach(code => {
                 if (!languageMap.has(code)) {
                     try {
-                        const langName = new Intl.DisplayNames(['en'], {type: 'language'}).of(code.split('-')[0]);
-                        languageMap.set(code, {name: langName, code: code});
+                        const langName = new Intl.DisplayNames(['en'], { type: 'language' }).of(code.split('-')[0]);
+                        languageMap.set(code, { name: langName, code: code });
                     } catch (e) {
-                        languageMap.set(code, {name: code, code: code});
+                        languageMap.set(code, { name: code, code: code });
                     }
                 }
             });
         });
 
-        elements.languageSelect.style.display = 'block';
+        elements.languageSelectWrapper.style.display = 'block';
         elements.languageSelectLabel.style.display = 'block';
-        elements.saveVoiceBtnContainer.style.display = 'block';
-        elements.totalUsageContainer.style.display = 'block';
+        elements.saveVoiceBtnContainer.style.display = 'flex';
+        elements.totalUsageContainer.style.display = 'flex';
 
         const sortedLanguages = [...languageMap.values()].sort((a, b) => a.name.localeCompare(b.name));
         elements.languageSelect.innerHTML = '';
-        sortedLanguages.forEach(({name, code}) => {
+        sortedLanguages.forEach(({ name, code }) => {
             const option = document.createElement('option');
             const countryCode = code.split('-')[1] || '';
             option.value = code;
@@ -245,7 +235,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const selectedLang = elements.languageSelect.value;
         const voicesForLang = state.allVoices.filter(v => v.languageCodes.includes(selectedLang));
         const tiers = {};
-
         voicesForLang.forEach(voice => {
             const tierKey = getVoiceTier(voice.name);
             if (!tiers[tierKey]) tiers[tierKey] = [];
@@ -265,6 +254,10 @@ document.addEventListener('DOMContentLoaded', () => {
                             <span>${voice.name} (${voice.ssmlGender.toLowerCase()})</span>
                         </label>
                     </div>
+                    <label class="voice-option">
+                        <input type="radio" name="voice-selection" value="${voice.name}" ${voice.name === state.selectedVoiceName ? 'checked' : ''}>
+                        <span>${voice.name.split('-').slice(2).join('-')} (${voice.ssmlGender.toLowerCase()})</span>
+                    </label>
                 `).join('');
 
                 card.innerHTML = `
@@ -275,9 +268,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     <p class="tier-desc">${tierInfo.desc}</p>
                     <div class="tier-details">
                         <span><strong>SKU:</strong> ${tierInfo.sku}</span>
-                        <span><strong>Free Tier:</strong> ${tierInfo.freeTier === 'N/A' ? 'N/A' : `${tierInfo.freeTier} chars/month`}</span>
+                        <span><strong>Free Tier:</strong> ${tierInfo.freeTier} chars/month</span>
                     </div>
-                    <div class="mt-3 space-y-2">${voiceOptionsHTML}</div>
+                    <div class="voice-options-grid">${voiceOptionsHTML}</div>
                 `;
                 elements.voiceTierContainer.appendChild(card);
             }
@@ -301,7 +294,6 @@ document.addEventListener('DOMContentLoaded', () => {
     elements.clearKeyBtn.addEventListener('click', clearApiKey);
     elements.saveVoiceBtn.addEventListener('click', saveVoiceSelection);
     elements.languageSelect.addEventListener('change', renderVoiceTiers);
-
 
     // --- Initialization ---
     loadSettings();

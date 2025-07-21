@@ -5,7 +5,6 @@
 4) Add markdown/next lines to the AI answers. 
 4) Save the Voices in a local/S3
 5) Change name to google scholar pdf reader with annotations "& TTS & AI"
-3) Improve UI of setting (make it prettier)
 10) Make a pull request to the original repo
 
 # Scholar PDF Reader with Annotations

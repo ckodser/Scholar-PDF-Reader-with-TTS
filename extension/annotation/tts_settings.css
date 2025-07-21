@@ -1,113 +1,185 @@
 /*
-  File: pdf_reader_app/static/css/style.css
-  Custom styles from your original website for the PDF viewer and UI components.
-*/
-body {
-    font-family: 'Inter', sans-serif;
-}
-#pdf-container {
-    position: relative;
-}
-.pdf-page {
-    position: relative;
-    margin: 0 auto 1rem;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-    border-radius: 8px;
-    overflow: hidden;
-}
-.pdf-canvas {
-    display: block;
-    border-radius: 8px;
-}
-.text-layer {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    color: transparent; /* Make text invisible but selectable */
-    line-height: 1;
-}
-.text-layer > span {
-    position: absolute;
-    white-space: pre;
-    cursor: pointer; /* Allow clicking on text */
-    transform-origin: 0% 0%;
-    border-radius: 2px;
-    transition: background-color 0.15s ease-in-out; /* Smooth transition for highlights */
-}
-/* Highlight for the sentence being read */
-.text-layer .highlight {
-    background-color: rgba(0, 155, 175, 0.37);
-}
-/* Faint highlight for hovering over a sentence */
-.text-layer .hover-highlight {
-    background-color: rgba(173, 216, 230, 0.3); /* Light blue */
-}
-/* Toggle Switch Styles */
-.toggle-checkbox:checked {
-    right: 0;
-    border-color: #4A90E2;
-}
-.toggle-checkbox:checked + .toggle-label {
-    background-color: #4A90E2;
-}
-/* API Key input validation styles */
-.valid-key {
-    border-color: #34D399 !important;
-    box-shadow: 0 0 0 2px rgba(52, 211, 153, 0.5);
-}
-.invalid-key {
-    border-color: #F87171 !important;
-    box-shadow: 0 0 0 2px rgba(248, 113, 113, 0.5);
-}
-/* Voice Selection Modal Styles */
-#voice-modal .voice-tier-card {
-    transition: all 0.2s ease-in-out;
-}
- #voice-modal .voice-tier-card.selected {
-    border-color: #3B82F6;
-    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);
-    transform: translateY(-2px);
+ * tts_settings.css
+ * Styles for the improved TTS settings UI components.
+ */
+
+:root {
+    /* Re-declaring for consistency, assuming they are in the main CSS */
+    --primary: #4374E0;
+    --primary-hover: #3865cc;
+    --text: #333333;
+    --text-secondary: #575757;
+    --background: #f8f9fa;
+    --card: #ffffff;
+    --border: #e0e0e0;
+    --border-radius: 8px;
+    --shadow: 0 4px 6px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
-/* NEW: Styles for the scrolled controls bar */
-#controls.scrolled #file-upload-wrapper {
-    display: none;
-}
-#controls.scrolled {
-    justify-content: center;
-}
-
-
-/* Speed Controls */
-.speed-controls {
+/* Total Usage Card */
+.total-usage-card {
+    background-color: var(--card);
+    border-radius: var(--border-radius);
+    padding: 24px;
+    box-shadow: var(--shadow);
     display: flex;
     align-items: center;
-    gap: 5px;
-    border: 1px solid #ddd;
-    border-radius: 5px;
-    padding: 5px;
-    margin-left: 20px;
+    gap: 20px;
+    border-left: 4px solid var(--primary);
 }
 
-.speed-btn {
-    width: 30px;
-    height: 30px;
+.total-usage-card .icon {
+    font-size: 36px;
+    color: var(--primary);
+    background-color: #e8f0fe;
+    padding: 12px;
+    border-radius: 50%;
+}
+
+.total-usage-card .usage-info h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.total-usage-card .usage-info p {
+    margin: 4px 0 0;
+    font-size: 14px;
+    color: var(--text-secondary);
+}
+
+.total-usage-card .usage-amount {
+    margin-left: auto;
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--primary);
+    font-family: 'Roboto Mono', monospace; /* Good for numbers */
+}
+
+/* Styled Select Dropdown */
+.styled-select {
+    position: relative;
+}
+
+.styled-select select {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    width: 100%;
+    padding: 12px 40px 12px 16px;
+    font-size: 15px;
+    border: 1px solid var(--border);
+    border-radius: var(--border-radius);
+    background-color: var(--card);
+    color: var(--text);
+    cursor: pointer;
+    transition: border-color 0.2s;
+}
+
+.styled-select select:hover {
+    border-color: #a0a0a0;
+}
+
+.styled-select select:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(67, 116, 224, 0.2);
+}
+
+.styled-select .select-arrow {
+    position: absolute;
+    top: 50%;
+    right: 16px;
+    transform: translateY(-50%);
+    pointer-events: none;
+    color: var(--text-secondary);
+    font-size: 24px;
+}
+
+/* Voice Tier Card Styles */
+.voice-tier-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--border-radius);
+    padding: 20px;
+    margin-bottom: 16px;
+    transition: box-shadow 0.2s, transform 0.2s;
+}
+
+.voice-tier-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow);
+}
+
+.tier-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    border-bottom: 1px solid #f0f0f0;
+    padding-bottom: 12px;
+    margin-bottom: 12px;
+}
+
+.tier-header h4 {
     font-size: 18px;
-    line-height: 1;
-    padding: 0;
-    background-color: #95a5a6;
+    font-weight: 600;
+    color: var(--text);
+    margin: 0;
 }
 
-.speed-btn:hover:not(:disabled) {
-    background-color: #7f8c8d;
+.tier-price {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--primary);
+    background-color: #e8f0fe;
+    padding: 4px 8px;
+    border-radius: 12px;
 }
 
-#speed-display {
-    font-size: 1em;
-    font-weight: bold;
-    min-width: 40px;
-    text-align: center;
-    color: #2c3e50;
+.tier-desc {
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin-bottom: 16px;
+}
+
+.tier-details {
+    font-size: 12px;
+    color: #777;
+    display: flex;
+    justify-content: space-between;
+    background: #fafafa;
+    padding: 8px 12px;
+    border-radius: 6px;
+}
+
+.voice-options-grid {
+    margin-top: 16px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+}
+
+.voice-option {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 6px;
+    transition: background-color 0.2s;
+}
+
+.voice-option:hover {
+    background-color: #f5f5f5;
+}
+
+.voice-option input[type="radio"] {
+    margin-right: 10px;
+    accent-color: var(--primary);
+}
+
+.save-button-container {
+    display: flex;
+    justify-content: center;
+    margin-top: 24px;
 }

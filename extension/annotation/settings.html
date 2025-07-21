@@ -283,7 +283,7 @@
         }
     </style>
     <link rel="stylesheet" href="tts_settings.css">
-    <link rel="stylesheet" href="ai_chat.css">
+    <link rel="stylesheet" href="ai_chat_settings.css">
 </head>
 <body>
 <div class="container">
@@ -305,54 +305,47 @@
     </div>
     <!-- Google Cloud TTS Section -->
     <div class="section">
-        <div class="mt-8 pt-8 border-t border-gray-200">
-            <h2 class="text-xl font-semibold text-gray-700">Google Cloud TTS</h2>
-            <p class="text-gray-500 mt-2">Configure your Google Cloud Text-to-Speech API key and voice preferences. This
-                is
-                required for the text-to-speech feature.</p>
+        <h2>Google Cloud TTS</h2>
+        <p>Configure your Google Cloud Text-to-Speech API key and voice preferences. Required for the text-to-speech feature.</p>
 
-            <div class="mt-6">
-                <h3 class="text-base font-semibold text-gray-600">API Key</h3>
-                <div class="flex gap-2 mt-2">
-                    <input type="password" id="api-key-input" placeholder="Enter Google Cloud API Key"
-                           style="padding: 0.75rem 1rem; font-size: 1rem; width: 300px;">
-                    <button id="validate-key-btn"
-                            class="inline-flex items-center px-4 py-2.5 bg-green-500 text-white font-semibold rounded-lg shadow-sm hover:bg-green-600 transition">
-                        <span class="icon mr-2">key</span>Validate
-                    </button>
-                    <button id="clear-key-btn"
-                            class="inline-flex items-center px-4 py-2.5 bg-red-500 text-white font-semibold rounded-lg shadow-sm hover:bg-red-600 transition">
-                        <span class="icon mr-2">delete</span>Remove
-                    </button>
+        <!-- API Key Input -->
+        <div style="margin-bottom: 24px;">
+            <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 8px;">API Key</h3>
+            <div class="button-group" style="margin-top: 0;">
+                <input type="password" id="api-key-input" placeholder="Enter Google Cloud API Key" style="padding: 12px 16px; font-size: 14px; flex-grow: 1; border: 1px solid #ccc; border-radius: 8px;">
+                <button id="validate-key-btn"><span class="icon">key</span>Validate</button>
+                <button id="clear-key-btn" class="secondary"><span class="icon">delete</span>Remove</button>
+            </div>
+        </div>
+
+        <!-- Total Usage Card -->
+        <div id="total-usage-container" class="total-usage-card" style="display:none;">
+            <span class="icon">receipt_long</span>
+            <div class="usage-info">
+                <h3>Total Usage</h3>
+                <p>Estimated cost for the current session.</p>
+            </div>
+            <div id="total-usage" class="usage-amount">$0.000000</div>
+        </div>
+
+        <!-- Voice Selection Container -->
+        <div id="voice-selection-container" style="display:none; margin-top: 24px;">
+            <div>
+                <label id="language-select-label" for="language-select" style="display:none; font-size: 16px; font-weight: 600; margin-bottom: 8px;">Language</label>
+                <div class="styled-select" id="language-select-wrapper" style="display:none;">
+                    <select id="language-select"></select>
+                    <span class="icon select-arrow">expand_more</span>
                 </div>
             </div>
 
-            <div class="mt-6" style="display:none" id="total-usage-container">
-                <h3 class="text-base font-semibold text-gray-600">Total Usage</h3>
-                <p class="text-gray-500 text-sm">Estimated cost for the current session. Resets when browser is
-                    closed.</p>
-                <p id="total-usage" class="text-2xl font-bold text-blue-600 mt-1">$0.000000</p>
+            <div id="voice-tier-container" style="margin-top: 24px;">
+                <!-- Voice models and prices will be populated here by tts_settings.js -->
             </div>
 
-            <div id="voice-selection-container" class="mt-8 pt-8 border-t border-gray-200">
-                <div>
-                    <label id="language-select-label" for="language-select"
-                           class="text-base font-semibold text-gray-600" style="display:none">Language</label>
-                    <select id="language-select" style="display:none"
-                            class="mt-2 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
-                        <!-- Options populated by JS -->
-                    </select>
-                </div>
-                <div id="voice-tier-container" class="mt-4 space-y-4">
-                    <!-- Voice models and prices populated by JS from settings.js -->
-                    <!-- The structure inside here will be created by your JS, e.g., .voice-tier-card -->
-                </div>
-                <div id="save-voice-btn-container" class="mt-6" style="display:none">
-                    <button id="save-voice-btn"
-                            class="inline-flex items-center px-5 py-2.5 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition">
-                        <span class="icon mr-2">save</span>Save Voice Selection
-                    </button>
-                </div>
+            <div id="save-voice-btn-container" class="save-button-container" style="display:none;">
+                <button id="save-voice-btn">
+                    <span class="icon">save</span>Save Voice Selection
+                </button>
             </div>
         </div>
     </div>
