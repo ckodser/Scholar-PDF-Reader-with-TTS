@@ -6,11 +6,14 @@
   <link rel="stylesheet" href="/reader-prod.css">
   <link rel="stylesheet" href="/tts/tts.css">
   <link rel="stylesheet" href="/annotation/annotation.css">
+  <link rel="stylesheet" href="/AiChat/AiChat.css">
   <script src="/reader-compiled.js" defer></script>
   <script src="/annotation/annotation.js" defer></script>
   <script src="/tts/tts.js" defer></script>
+  <script src="/AiChat/AiChat.js" defer></script>
   <script src="pdf.min.js" defer></script>
   <script src="pdf.worker.min.js" defer></script>
+
   <style>
     .hidden {
         display: none;
@@ -20,10 +23,43 @@
 <body>
   <div class="gsr-root-wrap"></div>
 
+<!-- AI Chat Panel Structure -->
+  <div id="ai-chat-panel">
+    <div class="chat-header">
+        <h3>
+            <span class="material-symbols-outlined">network_intelligence</span>
+            Chat with PDF
+        </h3>
+        <div class="chat-controls">
+            <button id="ai-chat-resize-btn" title="Toggle Size">
+                <span class="material-symbols-outlined">open_in_full</span>
+            </button>
+            <button id="ai-chat-close-btn" title="Close Chat">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+        </div>
+    </div>
+    <div id="ai-chat-messages">
+        <!-- Messages will be dynamically inserted here -->
+    </div>
+    <div class="chat-input-area">
+        <input type="text" id="ai-chat-input" placeholder="Ask a question about the PDF...">
+        <button id="ai-chat-send-btn" title="Send Message">
+            <span class="material-symbols-outlined">send</span>
+        </button>
+    </div>
+    <!-- Overlay for when the PDF is being processed -->
+    <div id="chat-processing-overlay" class="chat-processing-overlay hidden">
+        <div class="loader"></div>
+        <p>Analyzing PDF...</p>
+    </div>
+  </div>
+
+
   <div id="annotation-toolbar">
     <button id="highlight-btn" class="toolbar-button" data-tooltip="Highlight">
       <span class="material-symbols-outlined">ink_highlighter</span>
-  </button>
+    </button>
     <button id="erase-btn" class="toolbar-button" data-tooltip="Erase">
       <span class="material-symbols-outlined">ink_eraser</span>
     </button>
@@ -33,7 +69,7 @@
     <button id="settings-btn" class="toolbar-button" data-tooltip="Settings">
       <span class="material-symbols-outlined">settings</span>
     </button>
-    <div style="width: 1px; background-color: #555; margin: 5px;"></div>
+    <div id="tts-border" style="width: 1px; background-color: #555; margin: 5px;" class="hidden"></div>
 
 
     <button id="tts-prev-btn" class="toolbar-button hidden" data-tooltip="Previous Sentence">
@@ -48,11 +84,17 @@
     <button id="tts-stop-btn" class="toolbar-button hidden" data-tooltip="Stop (Esc)">
         <span class="material-symbols-outlined">stop</span>
     </button>
-    <button id="tts-activate-btn" class="toolbar-button" data-tooltip="Activate TTS">
+    <button id="tts-activate-btn" class="toolbar-button hidden" data-tooltip="Activate TTS">
         <span id="tts-activate-btn-text" class="material-symbols-outlined">volume_up</span>
     </button>
     <button id="tts-next-btn" class="toolbar-button hidden" data-tooltip="Next Sentence">
         <span class="material-symbols-outlined">skip_next</span>
+    </button>
+
+    <div id="ai-chat-border" style="width: 1px; background-color: #555; margin: 5px;" class="hidden"></div>
+
+    <button id="chat-activate-btn" class="toolbar-button hidden" data-tooltip="Chat with AI">
+        <span class="material-symbols-outlined">network_intelligence</span>
     </button>
   </div>
 </body>

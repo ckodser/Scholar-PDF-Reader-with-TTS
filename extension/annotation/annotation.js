@@ -930,6 +930,8 @@ async function initializeAnnotation() {
             }
             pdfUrl = receivedPdfUrl;
             console.log('PDF URL received:', pdfUrl);
+            window.pdfUrl = receivedPdfUrl; // Make URL globally available
+            console.log('PDF URL received and set globally:', pdfUrl);
         }
     }, false);
 

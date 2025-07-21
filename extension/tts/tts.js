@@ -459,6 +459,13 @@ async function initializeTTS() {
     console.log('Google TTS API key:', ttsState.apiKey);
     const savedVoice = await getCookie('selectedVoiceName');
     if (savedVoice) ttsState.selectedVoiceName = savedVoice;
+    if (ttsState.apiKey){
+        const btnActivate = document.getElementById('tts-activate-btn');
+        btnActivate.classList.toggle('hidden', false);
+
+        const ttsBorder = document.getElementById('tts-border');
+        ttsBorder.classList.toggle('hidden', false);
+    }
 }
 
 document.addEventListener('DOMContentLoaded', initializeTTS);
