@@ -1,4 +1,5 @@
 # TODO
+1) Add guide for generating a token
 2) Adjusting reading speed, UI, backend, etc.
 3) Add go to the reading part
 4) Save the Voices in a local/S3
