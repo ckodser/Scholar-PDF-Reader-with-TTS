@@ -24,6 +24,21 @@ The extension maintains all the functionality of the original Google Scholar PDF
 
 The annotation functionality is implemented through separate modules without modifying the original extension's code.
 
+## Privacy & Data Security
+
+This extension is built as an enhancement to the Google Scholar PDF Reader while maintaining strict privacy standards:
+
+- **Local Processing**: Annotations features operate entirely on your device, with no external data transmission
+- **Third-Party Services**:
+  - When using TTS (Text-to-Speech) or Gemini AI features, content is processed directly through Google's services
+  - These interactions occur directly between your browser and Google's servers
+  - No data passes through any intermediate servers
+- **No Usage Tracking**: We do not collect any usage statistics, personal information, or tracking data
+- **Data Storage**: All annotations and settings are stored locally in your browser
+- **Zero Third-Party Analytics**: The extension operates without any analytics or tracking services
+
+Your privacy is paramount - the extension is designed to function without requiring any data collection or monitoring systems.
+
 ## Installation
 
 The extension works with all Chromium-based browsers, including Google Chrome, Microsoft Edge, and Brave.
