@@ -1,16 +1,11 @@
-# TODO
-1) Add guide for generating a token
-2) Adjusting reading speed, UI, backend, etc.
-3) Add go to the reading part
-4) Save the Voices in a local/S3
-5) Make a pull request to the original repo
-
 # AI Scholar PDF Reader
 
-This extension adds annotation capabilities to the Google Scholar PDF Reader extension. The extended features include:
+This extension adds annotation/TTS and Ai chat capabilities to the Google Scholar PDF Reader extension. The extended features include:
 
+- Chat with Gemini about your PDF
+- TTS for reading your PDF aloud
 - Highlight text with colors (yellow, green, blue, pink, red, or custom).
-- Easily remove individual annotations or clear them all at once.
+- Remove individual annotations or clear them all at once.
 - Undo and redo actions for annotations.
 - Import and export annotations into a JSON file.
 
@@ -37,7 +32,7 @@ Unfortunately, the original extension uses features unsupported by Firefox or Sa
 To install the extension, follow these steps:
 
 0. Uninstall the original Google Scholar PDF Reader extension if you have it installed.
-1. [Download the latest release](https://github.com/salcc/Scholar-PDF-Reader-with-Annotations/releases/latest).
+1. [Download the latest release](https://github.com/ckodser/Scholar-PDF-Reader-with-AI/releases/latest).
 2. Extract the ZIP file to a folder on your computer.
 3. Open the browser's extension management page:
    - Chrome: `chrome://extensions`
@@ -56,6 +51,8 @@ Note that the extension will not automatically update when new versions are rele
 
 ## Usage
 
+### Annotations
+
 The annotation capabilities are easily accessible through the annotation toolbar. Moreover, these keyboard shortcuts can be used:
 
 - <kbd>h</kbd>: Toggle the highlight tool.
@@ -67,11 +64,28 @@ The annotation capabilities are easily accessible through the annotation toolbar
 - <kbd>Ctrl</kbd>/<kbd>Cmd</kbd> + <kbd>z</kbd>: Undo the last action.
 - <kbd>Ctrl</kbd>/<kbd>Cmd</kbd> + <kbd>y</kbd> or <kbd>Ctrl</kbd>/<kbd>Cmd</kbd> + <kbd>Shift</kbd> + <kbd>z</kbd>: Redo the last undone action.
 
+
+### TTS and Gemini Configuration
+
+To enable Text-to-Speech (TTS) and AI chat capabilities:
+
+1. Open any PDF document
+2. Click the settings icon (⚙️) in the toolbar
+3. In the settings panel:
+   - Enter your Gemini API token to enable AI chat features
+   - Enter your TTS token to enable read-aloud functionality
+
+These tokens are required for accessing the respective services and need to be configured only once. Your tokens will be securely stored for future use.
+
 ## Planned Features
 
 The following features are planned for future releases:
 
-- Annotation storage backup in the cloud (Google Drive and iCloud probably).
+- Add the option for third party proxy servers for APIs
+- Add a guide for generating a token
+- Adjusting reading speed, UI, backend, etc.
+- Add go to the reading part
+- Annotation/TTS/Ai Chats storage backup in the cloud (Google Drive, S3, or iCloud probably).
 - Underline and strikeout text.
 - Drawing tools (freehand, lines, shapes).
 - Text comments and sticky notes.
@@ -98,5 +112,3 @@ For bug reports and feature suggestions, please open an issue on GitHub. Feel fr
 ## Disclaimer
 
 This project is not affiliated with, supported, or endorsed by Google. Nonetheless, by installing this extension, you agree to the Google Terms of Service and Privacy Policy at https://www.google.com/intl/en/policies/.
-
-
