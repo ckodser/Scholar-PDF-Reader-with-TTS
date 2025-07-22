@@ -68,6 +68,7 @@ async function getPdfTextData(pdfUrl, pageNum) {
 }
 
 async function processPageForTTS(pageElement, pdfUrl, pageNum) {
+    if (!ttsState.isEnabled) return;
     const pdfTextItems = await getPdfTextData(pdfUrl, pageNum);
     if (!pdfTextItems || pdfTextItems.length === 0) return;
     const pdfRawText = pdfTextItems.map(item => item.str).join(' ');
@@ -133,6 +134,7 @@ async function processPageForTTS(pageElement, pdfUrl, pageNum) {
 // --- Playback Controls ---
 function activateTTS() {
     const isEnabled = !ttsState.isEnabled;
+    if (isEnabled) {initializeTTSAfterActivation().then(r => console.log('TTS initialized.'));}
     ttsState.isEnabled = isEnabled;
     document.getElementById('tts-prev-btn').classList.toggle('hidden', !isEnabled);
     document.getElementById('tts-play-btn').classList.toggle('hidden', !isEnabled);
@@ -320,23 +322,68 @@ function clearHighlight() {
 }
 
 // --- Initialization ---
-async function initializeTTS() {
+async function initializeTTSAfterActivation() {
     console.log('Initializing TTS...');
     document.getElementById('tts-play-btn').addEventListener('click', play);
     document.getElementById('tts-pause-btn').addEventListener('click', pause);
     document.getElementById('tts-stop-btn').addEventListener('click', stop);
     document.getElementById('tts-next-btn').addEventListener('click', nextSentence);
     document.getElementById('tts-prev-btn').addEventListener('click', previousSentence);
+
+    const savedVoice = await getCookie('selectedVoiceName');
+    if (savedVoice) ttsState.selectedVoiceName = savedVoice;
+
+
+        console.log("TTS activated. Processing currently loaded pages...");
+
+        // The global `pdfUrl` is set in annotation.js as `window.pdfUrl`.
+        const currentPdfUrl = window.pdfUrl;
+        if (!currentPdfUrl) {
+            console.error("PDF URL not found. Cannot process pages for TTS.");
+            return; // Exit if the URL isn't available
+        }
+
+        const allLoadedPages = document.querySelectorAll('.gsr-page');
+        const allPagesList = Array.from(allLoadedPages); // Create a static list for correct indexing
+
+        allLoadedPages.forEach(pageElement => {
+            let pageNum;
+
+            // Method 1: Use the data attribute if it exists (same as your observer).
+            if (pageElement.dataset.pageNumber) {
+                pageNum = parseInt(pageElement.dataset.pageNumber, 10);
+            } else {
+                // Method 2 (Fallback): Find the element's index.
+                const pageIndex = allPagesList.indexOf(pageElement);
+                if (pageIndex !== -1) {
+                    pageNum = pageIndex + 1; // Page numbers are 1-based
+                }
+            }
+
+            // If a page number was determined, process the page.
+            if (pageNum) {
+                processPageForTTS(pageElement, currentPdfUrl, pageNum).catch(err => {
+                    console.error(`Error processing page ${pageNum} after TTS activation:`, err);
+                });
+            } else {
+                console.warn("Could not determine page number for a loaded page element.", pageElement);
+            }
+        });
+
+}
+
+
+// --- Initialization ---
+async function initializeTTS() {
     document.getElementById('tts-activate-btn').addEventListener('click', activateTTS);
 
     ttsState.apiKey = await getCookie('googleTtsApiKey');
-    const savedVoice = await getCookie('selectedVoiceName');
-    if (savedVoice) ttsState.selectedVoiceName = savedVoice;
 
     if (ttsState.apiKey) {
         document.getElementById('tts-activate-btn').classList.remove('hidden');
         document.getElementById('tts-border').classList.remove('hidden');
     }
 }
+
 
 document.addEventListener('DOMContentLoaded', initializeTTS);
