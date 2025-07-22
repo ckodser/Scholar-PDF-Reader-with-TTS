@@ -96,8 +96,9 @@ These tokens are required for accessing the respective services and need to be c
 
 The following features are planned for future releases:
 
+- Shift enter for enter in chat/ double enter for sending the message. 
 - Add the option for third party proxy servers for APIs
-- Add a guide for generating a token
+- improve the guide for generating a token
 - Adjusting reading speed, UI, backend, etc.
 - Add go to the reading part
 - Annotation/TTS/Ai Chats storage backup in the cloud (Google Drive, S3, or iCloud probably).

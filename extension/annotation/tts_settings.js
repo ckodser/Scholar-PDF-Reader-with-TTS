@@ -19,6 +19,10 @@ document.addEventListener('DOMContentLoaded', () => {
         voiceTierContainer: document.getElementById('voice-tier-container'),
         saveVoiceBtn: document.getElementById('save-voice-btn'),
         status: document.getElementById('status'),
+        apiKeyModal: document.getElementById('api-key-modal'),
+        showApiKeyModalBtn: document.getElementById('show-api-key-modal-btn'),
+        closeApiKeyModalBtn: document.getElementById('close-api-key-modal-btn'),
+
     };
 
     // --- State ---
@@ -175,7 +179,7 @@ document.addEventListener('DOMContentLoaded', () => {
         elements.languageSelect.value = await getCookie('selectedLanguage') || 'en-US';
     };
 
-    const renderVoiceTiers = () => {
+     const renderVoiceTiers = () => {
         const selectedLang = elements.languageSelect.value;
         const voicesForLang = state.allVoices.filter(v => v.languageCodes.includes(selectedLang));
         const tiers = {};
@@ -191,6 +195,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 const tierInfo = VOICE_TIER_DATA[tierKey];
                 const card = document.createElement('div');
                 card.className = 'voice-tier-card';
+
+                // Check if the currently saved voice is in this tier to expand it by default
+                const isExpanded = tiers[tierKey].some(voice => voice.name === state.selectedVoiceName);
+
                 let voiceOptionsHTML = tiers[tierKey].map(voice => `
                     <label class="voice-option">
                         <input type="radio" name="voice-selection" value="${voice.name}" ${voice.name === state.selectedVoiceName ? 'checked' : ''}>
@@ -199,22 +207,35 @@ document.addEventListener('DOMContentLoaded', () => {
                 `).join('');
 
                 card.innerHTML = `
-                    <div class="tier-header">
-                        <h4>${tierInfo.name}</h4>
-                        <span class="tier-price">$${tierInfo.price.toFixed(2)} / 1M chars</span>
+                    <div class="tier-header tier-toggle ${isExpanded ? 'expanded' : ''}">
+                        <div class="tier-header-main">
+                            <h4>${tierInfo.name}</h4>
+                            <span class="tier-price">$${tierInfo.price.toFixed(2)} / 1M chars</span>
+                        </div>
+                        <span class="icon tier-icon">expand_more</span>
                     </div>
-                    <p class="tier-desc">${tierInfo.desc}</p>
-                    <div class="tier-details">
-                        <span><strong>SKU:</strong> ${tierInfo.sku}</span>
-                        <span><strong>Free Tier:</strong> ${tierInfo.freeTier} chars/month</span>
+                    <div class="tier-content ${isExpanded ? '' : 'collapsed'}">
+                        <p class="tier-desc">${tierInfo.desc}</p>
+                        <div class="tier-details">
+                            <span><strong>SKU:</strong> ${tierInfo.sku}</span>
+                            <span><strong>Free Tier:</strong> ${tierInfo.freeTier} chars/month</span>
+                        </div>
+                        <div class="voice-options-grid">${voiceOptionsHTML}</div>
                     </div>
-                    <div class="voice-options-grid">${voiceOptionsHTML}</div>
                 `;
                 elements.voiceTierContainer.appendChild(card);
             }
         });
-    };
 
+        // Add event listeners for the new collapsible toggles
+        document.querySelectorAll('.tier-toggle').forEach(toggle => {
+            toggle.addEventListener('click', () => {
+                const content = toggle.nextElementSibling;
+                toggle.classList.toggle('expanded');
+                content.classList.toggle('collapsed');
+            });
+        });
+    };
     const saveVoiceSelection = () => {
         const selectedRadio = document.querySelector('input[name="voice-selection"]:checked');
         if (selectedRadio) {
@@ -232,6 +253,20 @@ document.addEventListener('DOMContentLoaded', () => {
     elements.clearKeyBtn.addEventListener('click', clearApiKey);
     elements.saveVoiceBtn.addEventListener('click', saveVoiceSelection);
     elements.languageSelect.addEventListener('change', renderVoiceTiers);
+
+    elements.showApiKeyModalBtn.addEventListener('click', () => {
+        elements.apiKeyModal.classList.remove('hidden');
+    });
+
+    elements.closeApiKeyModalBtn.addEventListener('click', () => {
+        elements.apiKeyModal.classList.add('hidden');
+    });
+
+    elements.apiKeyModal.addEventListener('click', (event) => {
+        if (event.target === elements.apiKeyModal) {
+            elements.apiKeyModal.classList.add('hidden');
+        }
+    });
 
     // --- Initialization ---
     loadSettings();

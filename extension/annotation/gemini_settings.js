@@ -14,6 +14,9 @@ document.addEventListener('DOMContentLoaded', () => {
         status: document.getElementById('status'), // Re-using the general status element
         geminiUsageContainer: document.getElementById('total-gemini-usage-container'),
         totalUsageDisplay: document.getElementById('total-usage-gemini'),
+        geminiModal: document.getElementById('gemini-api-key-modal'),
+        showGeminiModalBtn: document.getElementById('show-gemini-modal-btn'),
+        closeGeminiModalBtn: document.getElementById('close-gemini-modal-btn'),
     };
 
     // --- State ---
@@ -66,6 +69,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     };
+
 
 
     // --- Utility Functions ---
@@ -259,7 +263,29 @@ document.addEventListener('DOMContentLoaded', () => {
     elements.validateKeyBtn.addEventListener('click', () => validateApiKey(true));
     elements.clearKeyBtn.addEventListener('click', clearApiKey);
     elements.saveModelBtn.addEventListener('click', saveModelSelection);
-
+    // --- Gemini API Key Modal Logic ---
+    if (elements.showGeminiModalBtn) {
+        elements.showGeminiModalBtn.addEventListener('click', () => {
+            if (elements.geminiModal) {
+                elements.geminiModal.classList.remove('hidden');
+            }
+        });
+    }
+    if (elements.closeGeminiModalBtn) {
+        elements.closeGeminiModalBtn.addEventListener('click', () => {
+            if (elements.geminiModal) {
+                elements.geminiModal.classList.add('hidden');
+            }
+        });
+    }
+    if (elements.geminiModal) {
+        elements.geminiModal.addEventListener('click', (event) => {
+            // Close modal if user clicks on the background overlay
+            if (event.target === elements.geminiModal) {
+                elements.geminiModal.classList.add('hidden');
+            }
+        });
+    }
 
     // --- Initialization ---
     loadSettings();

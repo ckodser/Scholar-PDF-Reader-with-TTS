@@ -310,7 +310,10 @@
 
         <!-- API Key Input -->
         <div style="margin-bottom: 24px;">
-            <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 8px;">API Key</h3>
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                 <h3 style="font-size: 16px; font-weight: 600; margin: 0;">API Key</h3>
+                 <button id="show-api-key-modal-btn" style="padding: 2px 10px; font-size: 12px; line-height: 1.5; border-radius: 6px;" class="secondary">Help</button>
+            </div>
             <div class="button-group" style="margin-top: 0;">
                 <input type="password" id="api-key-input" placeholder="Enter Google Cloud API Key" style="padding: 12px 16px; font-size: 14px; flex-grow: 1; border: 1px solid #ccc; border-radius: 8px;">
                 <button id="validate-key-btn"><span class="icon">key</span>Validate</button>
@@ -353,10 +356,12 @@
     <div class="section">
         <h2>Gemini AI Chat</h2>
         <p>Configure your Google AI Gemini API key and model preferences. Required for the AI chat feature.</p>
-        <a href="https://aistudio.google.com/apikey">Get api from this link</a>
         <div style="margin-bottom: 24px;">
             <div>
-                <h3>API Key</h3>
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                    <h3 style="font-size: 16px; font-weight: 600; margin: 0;">API Key</h3>
+                    <button id="show-gemini-modal-btn" style="padding: 2px 10px; font-size: 12px; line-height: 1.5; border-radius: 6px;" class="secondary">Help</button>
+                </div>
                 <div class="button-group" style="margin-top: 12px;">
                     <input type="password" id="ai-chat-api-key-input" placeholder="Enter Google AI Gemini API Key"
                            style="padding: 10px; font-size: 14px; flex-grow: 1; border: 1px solid #ccc; border-radius: 8px;">
@@ -404,6 +409,33 @@
                 <span class="icon">star</span>Star Repository
             </a>
         </div>
+    </div>
+</div>
+<div id="api-key-modal" class="modal hidden">
+    <div class="modal-content">
+        <h2>How to get a Google Cloud TTS API Key</h2>
+        <ol>
+            <li>Go to the <a href="https://console.cloud.google.com/" target="_blank">Google Cloud Console</a>.</li>
+            <li>Create a new project or select an existing one.</li>
+            <li>Enable the <strong>"Cloud Text-to-Speech API"</strong> for your project. You can find it in the API Library.</li>
+            <li>Go to "Credentials" and click "Create Credentials" &rarr; "API key".</li>
+            <li>Copy the generated API key and paste it into the input box.</li>
+            <li><strong>Important:</strong> For security, it's highly recommended to restrict your API key to only be usable by the Cloud Text-to-Speech API.</li>
+        </ol>
+        <button id="close-api-key-modal-btn">Close</button>
+    </div>
+</div>
+<div id="gemini-api-key-modal" class="modal hidden">
+    <div class="modal-content">
+        <h2>How to get a Google AI Gemini API Key</h2>
+        <ol>
+            <li>First, go to <a href="https://aistudio.google.com/apikey" target="_blank">Google AI Studio</a> to get your API key.</li>
+            <li>Click on <strong>"Create API key in new project"</strong>.</li>
+            <li>Copy the generated API key that appears in the pop-up window.</li>
+            <li>Return to this settings page and paste the key into the input box.</li>
+            <li><strong>Important:</strong> Keep your API key private and secure. Do not share it publicly.</li>
+        </ol>
+        <button id="close-gemini-modal-btn">Close</button>
     </div>
 </div>
 <script src="settings.js"></script>
