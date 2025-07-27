@@ -21,22 +21,22 @@ let aiChatState = {
 const GEMINI_MODELS_DATA = {
     'gemini-2.5-pro': {
         pricing: {
-            input: { text: 1.25, document: 1.25 },
-            output: { text: 10.00 }
+            input: {text: 1.25, document: 1.25},
+            output: {text: 10.00}
         },
         name: 'Gemini 2.5 Pro',
     },
     'gemini-2.5-flash': {
         pricing: {
-            input: { text: 0.30, document: 0.30 },
-            output: { text: 2.50 }
+            input: {text: 0.30, document: 0.30},
+            output: {text: 2.50}
         },
         name: 'Gemini 2.5 Flash',
     },
     'gemini-2.5-flash-lite-preview-06-17': {
         pricing: {
-            input: { text: 0.10, document: 0.10 },
-            output: { text: 0.40 }
+            input: {text: 0.10, document: 0.10},
+            output: {text: 0.40}
         },
         name: 'Gemini 2.5 Flash Lite Preview',
     }
@@ -51,6 +51,7 @@ function cacheDomElements() {
     dom.aiChatBorder = document.getElementById('ai-chat-border');
     dom.chatPanel = document.getElementById('ai-chat-panel');
     dom.chatCloseBtn = document.getElementById('ai-chat-close-btn');
+    dom.chatDeleteBtn = document.getElementById('ai-chat-delete-btn');
     dom.chatResizeBtn = document.getElementById('ai-chat-resize-btn');
     dom.chatMessages = document.getElementById('ai-chat-messages');
     dom.chatInput = document.getElementById('ai-chat-input');
@@ -66,13 +67,14 @@ function cacheDomElements() {
 function getStorage(key) {
     return new Promise((resolve) => chrome.storage.local.get([key], (result) => resolve(result[key])));
 }
+
 function setStorage(data) {
     return new Promise((resolve) => chrome.storage.local.set(data, resolve));
 }
 
 async function getPdfUrlWithRetry(retries = 10, delay = 500) {
     for (let i = 0; i < retries; i++) {
-        if (window.pdfUrl){
+        if (window.pdfUrl) {
             aiChatState.pdfId = window.pdfUrl;
             return window.pdfUrl;
         }
@@ -100,18 +102,46 @@ async function fetchAndEncodePdf() {
 
 // --- UI Rendering and Manipulation ---
 
-function toggleChatPanel() {
+async function toggleChatPanel() {
     aiChatState.isPanelOpen = !aiChatState.isPanelOpen;
     dom.chatPanel.classList.toggle('hidden', !aiChatState.isPanelOpen);
     if (aiChatState.isPanelOpen && aiChatState.tabs.length === 0) {
-        createNewTab();
+        await createNewTab();
     }
+    dom.chatDeleteBtn.classList.toggle('hidden', !aiChatState.isPanelExpanded);
 }
 
 function toggleChatSize() {
     aiChatState.isPanelExpanded = !aiChatState.isPanelExpanded;
     dom.chatPanel.classList.toggle('expanded', aiChatState.isPanelExpanded);
     dom.chatResizeBtn.querySelector('.material-symbols-outlined').textContent = aiChatState.isPanelExpanded ? 'close_fullscreen' : 'open_in_full';
+    dom.chatDeleteBtn.classList.toggle('hidden', !aiChatState.isPanelExpanded);
+}
+
+/**
+ * Deletes all messages for the CURRENT PDF from both the UI and storage.
+ */
+async function deleteAllMessages() {
+    if (!aiChatState.pdfId) {
+        console.warn("Cannot delete messages without a PDF ID.");
+        return;
+    }
+
+    // Reset the local state
+    aiChatState.tabs = [];
+
+    try {
+        // Remove the history for this specific PDF from storage
+        const storageKey = `chatHistory_${aiChatState.pdfId}`;
+        await new Promise((resolve) => chrome.storage.local.remove(storageKey, resolve));
+        console.log(`Deleted chat history from storage for key: ${storageKey}`);
+    } catch (error) {
+        console.error("Failed to delete conversations from storage:", error);
+    }
+
+    // Create a new blank tab for the user to start over
+    await createNewTab(); // This function already handles rendering and saving the new empty state
+    console.log('All messages for this PDF have been deleted.');
 }
 
 function renderMessage(sender, text) {
@@ -155,7 +185,6 @@ function renderActiveTabMessages() {
     const activeTab = aiChatState.tabs.find(t => t.id === aiChatState.activeTabId);
     if (activeTab) {
         activeTab.conversation.forEach(msg => {
-            if (msg.role === 'user' && msg.parts.length > 1) return;
             renderMessage(msg.role === 'model' ? 'ai' : 'user', msg.parts[0].text);
         });
     }
@@ -170,8 +199,10 @@ async function createNewTab() {
         name: `Chat ${aiChatState.tabs.length + 1}`,
         conversation: [],
         isInitialized: false,
+        isThinking: false,
     };
     aiChatState.tabs.push(newTab);
+    await saveConversations();
     await switchTab(tabId); // Await the switch, which also handles saving.
 }
 
@@ -181,13 +212,17 @@ async function switchTab(tabId) {
     aiChatState.activeTabId = tabId;
     renderTabs();
     renderActiveTabMessages();
-
     const activeTab = aiChatState.tabs.find(t => t.id === tabId);
     if (activeTab && !activeTab.isInitialized) {
         await preparePdfForConversation();
     }
-    // Save the state after any tab switch.
-    await saveConversations();
+    if (activeTab && activeTab.isThinking) {
+        activeTab.thinkingIndicator = await showThinkingIndicator();
+        dom.chatSendBtn.disabled = true;
+    } else {
+        dom.chatSendBtn.disabled = false;
+    }
+
 }
 
 
@@ -210,60 +245,76 @@ async function preparePdfForConversation() {
     }
 }
 
+async function showThinkingIndicator() {
+    const activeTab = aiChatState.tabs.find(t => t.id === aiChatState.activeTabId);
+    if (!activeTab) return;
+    const thinkingMessage = document.createElement('div');
+    thinkingMessage.className = 'chat-message ai thinking-indicator';
+    thinkingMessage.innerHTML = `<div class="message-content">Thinking...</div>`;
+    dom.chatMessages.appendChild(thinkingMessage);
+    dom.chatMessages.scrollTop = dom.chatMessages.scrollHeight;
+    return thinkingMessage;
+}
+
 async function handleSendMessage() {
     const userInput = dom.chatInput.value.trim();
     const activeTab = aiChatState.tabs.find(t => t.id === aiChatState.activeTabId);
-    if (!userInput || aiChatState.isAnalyzing || !activeTab) return;
+    if (!userInput || activeTab.isThinking || !activeTab) return;
 
     renderMessage('user', userInput);
 
     let userMessageParts;
     if (activeTab.conversation.length === 0 && aiChatState.pdfDataB64) {
         userMessageParts = [
-            { text: userInput },
-            { inlineData: { mimeType: 'application/pdf', data: aiChatState.pdfDataB64 } }
+            {text: userInput},
+            {inlineData: {mimeType: 'application/pdf', data: aiChatState.pdfDataB64}}
         ];
     } else {
-        userMessageParts = [{ text: userInput }];
+        userMessageParts = [{text: userInput}];
     }
 
-    activeTab.conversation.push({ role: 'user', parts: userMessageParts });
+    activeTab.conversation.push({role: 'user', parts: userMessageParts});
     dom.chatInput.value = '';
     dom.chatSendBtn.disabled = true;
-
-    const thinkingMessage = document.createElement('div');
-    thinkingMessage.className = 'chat-message ai thinking-indicator';
-    thinkingMessage.innerHTML = `<div class="message-content">Thinking...</div>`;
-    dom.chatMessages.appendChild(thinkingMessage);
-    dom.chatMessages.scrollTop = dom.chatMessages.scrollHeight;
+    activeTab.isThinking = true;
+    await saveConversations();
+    activeTab.thinkingIndicator = await showThinkingIndicator();
 
     try {
         const responseData = await callGeminiAPI(activeTab.conversation);
         const responseText = responseData.candidates[0].content.parts[0].text;
 
-        activeTab.conversation.push({ role: 'model', parts: [{ text: responseText }] });
+        activeTab.conversation.push({role: 'model', parts: [{text: responseText}]});
 
         // Record usage after a successful call
+
         await recordGeminiUsage(responseData);
         await saveConversations();
 
-        thinkingMessage.remove();
-        renderMessage('ai', responseText);
+        if (aiChatState.activeTabId === activeTab.id) {
+            activeTab.thinkingIndicator.remove();
+            renderMessage('ai', responseText);
+        }
     } catch (error) {
         console.error("Error sending message:", error);
-        thinkingMessage.remove();
-        renderMessage('ai', `Sorry, an error occurred: ${error.message}`);
+        if (aiChatState.activeTabId === activeTab.id) {
+            activeTab.thinkingIndicator.remove();
+            renderMessage('ai', `Sorry, an error occurred: ${error.message}`);
+        }
     } finally {
-        dom.chatSendBtn.disabled = false;
+        activeTab.isThinking = false;
+        if (aiChatState.activeTabId === activeTab.id) {
+            dom.chatSendBtn.disabled = false;
+        }
     }
 }
 
 async function callGeminiAPI(history) {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${aiChatState.model}:generateContent?key=${aiChatState.apiKey}`;
-    const payload = { contents: history };
+    const payload = {contents: history};
     const response = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(payload),
     });
     const data = await response.json();
@@ -283,7 +334,7 @@ async function recordGeminiUsage(responseData) {
         return;
     }
 
-    const { usageMetadata } = responseData;
+    const {usageMetadata} = responseData;
     const modelUsed = aiChatState.model; // Or responseData.modelVersion if you want to be precise
     const modelPricing = GEMINI_MODELS_DATA[modelUsed]?.pricing;
 
@@ -318,7 +369,7 @@ async function recordGeminiUsage(responseData) {
     try {
         const currentTotal = await getStorage('totalGeminiCost') || 0;
         const newTotal = currentTotal + callCost;
-        chrome.storage.local.set({ totalGeminiCost: newTotal });
+        chrome.storage.local.set({totalGeminiCost: newTotal});
         console.log(`Recorded Gemini cost: $${callCost.toFixed(6)}. New total: $${newTotal.toFixed(6)}`);
     } catch (error) {
         console.error("Failed to record Gemini usage:", error);
@@ -326,7 +377,8 @@ async function recordGeminiUsage(responseData) {
 }
 
 /**
- * Saves the current state of conversations for the active PDF to chrome.storage.
+ * Saves the current state of conversations for the active PDF to chrome.storage
+ * under a unique key, after removing all PDF data to keep storage small.
  */
 async function saveConversations() {
     if (!aiChatState.pdfId) {
@@ -334,33 +386,98 @@ async function saveConversations() {
         return;
     }
     try {
-        const allHistories = await getStorage('allChatHistories') || {};
-        allHistories[aiChatState.pdfId] = {
-            tabs: aiChatState.tabs,
+        const storageKey = `chatHistory_${aiChatState.pdfId}`;
+        console.log(`Saving conversations to key: ${storageKey}`);
+        logTabs()
+        // Create a deep copy to avoid modifying the live state.
+        const tabsForStorage = JSON.parse(JSON.stringify(aiChatState.tabs));
+
+        // Strip out any inline PDF data from all conversations before saving.
+        tabsForStorage.forEach(tab => {
+            if (tab.conversation) {
+                tab.conversation.forEach(message => {
+                    // Check all user messages and filter out the PDF data part.
+                    if (message.role === 'user' && message.parts.length > 1) {
+                        message.parts = message.parts.filter(part => !part.inlineData);
+                    }
+                });
+            }
+        });
+
+        const dataToSave = {
+            tabs: tabsForStorage, // Save the cleaned tabs
             activeTabId: aiChatState.activeTabId,
             lastUpdated: new Date().toISOString()
         };
-        await setStorage({ allChatHistories: allHistories });
+
+        await setStorage({ [storageKey]: dataToSave });
+
     } catch (error) {
         console.error("Error saving conversations:", error);
     }
 }
 
+function logTabs() {
+    for (let i = 0; i < aiChatState.tabs.length; i++) {
+        console.log("conversation ", i);
+        let tab = aiChatState.tabs[i];
+        if (tab.conversation && tab.conversation.length > 0) {
+            for (let j = 0; j < tab.conversation.length; j++) {
+                if(tab.conversation[j].parts.length > 1){
+                    console.log("message", j, "PDF", tab.conversation[j].parts[1].inlineData.data.length)
+                }
+
+                console.log("message", j, tab.conversation[j].parts[0].text)
+            }
+        }
+    }
+}
+
 /**
- * Loads conversations for the active PDF from chrome.storage and populates the state.
+ * Loads conversations from storage and re-attaches the PDF encoding to the
+ * first message of each conversation tab.
  */
 async function loadConversations() {
     try {
         const pdfId = await getPdfUrlWithRetry();
         if (!pdfId) return;
 
-        const allHistories = await getStorage('allChatHistories') || {};
-        const pdfHistory = allHistories[pdfId];
-        console.log(`Loading conversations for PDF: ${pdfId}`);
+        const storageKey = `chatHistory_${pdfId}`;
+        console.log(`Loading conversations from key: ${storageKey}`);
+
+        const pdfHistory = await getStorage(storageKey);
+
         if (pdfHistory && pdfHistory.tabs && pdfHistory.tabs.length > 0) {
-            aiChatState.tabs = pdfHistory.tabs;
+            // First, fetch and encode the PDF data for this session.
+            const pdfDataB64 = await fetchAndEncodePdf();
+            console.log('PDF encoded, re-attaching to conversations...');
+
+            // Now, iterate through the loaded tabs and re-insert the PDF data.
+            pdfHistory.tabs.forEach(tab => {
+                // The PDF is only attached to the very first message of a conversation.
+                if (tab.conversation && tab.conversation.length > 0) {
+                    const firstMessage = tab.conversation[0];
+                    if (firstMessage.role === 'user') {
+                         // Add the PDF data back to the first message's 'parts' array.
+                         firstMessage.parts.push({
+                            inlineData: {
+                                mimeType: 'application/pdf',
+                                data: pdfDataB64
+                            }
+                        });
+                    }
+                }
+            });
+
+            // With the tabs fully reconstructed, update the main state.
+            aiChatState.tabs = pdfHistory.tabs.map(tab => ({
+                ...tab,
+                isThinking: false,
+            }));
             aiChatState.activeTabId = pdfHistory.activeTabId || pdfHistory.tabs[0].id;
-            console.log(`Loaded ${aiChatState.tabs.length} chat tabs for this PDF.`);
+
+            console.log(`Loaded and rehydrated ${aiChatState.tabs.length} chat tabs.`);
+            logTabs()
         } else {
             console.log('No saved conversations found for this PDF.');
         }
@@ -402,6 +519,7 @@ async function initializeAiChat() {
     dom.chatResizeBtn.addEventListener('click', toggleChatSize);
     dom.newTabBtn.addEventListener('click', createNewTab);
     dom.chatSendBtn.addEventListener('click', handleSendMessage);
+    dom.chatDeleteBtn.addEventListener('click', deleteAllMessages)
     dom.chatInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
