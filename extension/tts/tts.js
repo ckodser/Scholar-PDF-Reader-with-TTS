@@ -268,28 +268,97 @@ async function recordTtsUsage(characterCount) {
     }
 }
 
+/**
+ * Splits a string into smaller chunks without breaking words, ensuring no chunk exceeds the maxLength.
+ * @param {string} text The text to split.
+ * @param {number} maxLength The maximum length of each chunk.
+ * @returns {string[]} An array of text chunks.
+ */
+function splitTextIntoChunks(text, maxLength = 500) {
+    if (text.length <= maxLength) {
+        return [text];
+    }
+
+    const chunks = [];
+    const words = text.split(' ');
+    let currentChunk = "";
+
+    for (const word of words) {
+        // Check if adding the next word (plus a space) would exceed the maxLength.
+        if ((currentChunk.length + word.length + 1) > maxLength) {
+            // If the current chunk is not empty, push it to the array.
+            if (currentChunk.length > 0) {
+                chunks.push(currentChunk.trim());
+            }
+            // Start a new chunk with the current word.
+            currentChunk = word;
+        } else {
+            // Otherwise, add the word to the current chunk.
+            currentChunk += (currentChunk.length === 0 ? "" : " ") + word;
+        }
+    }
+
+    // Push the last remaining chunk.
+    if (currentChunk.length > 0) {
+        chunks.push(currentChunk.trim());
+    }
+
+    return chunks;
+}
+
+/**
+ * Generates audio from text using Google's Text-to-Speech API.
+ * Automatically handles long text by splitting it into chunks and concatenating the audio.
+ * @param {string} text The text to synthesize.
+ * @param {string} cacheKey A unique key for caching the audio.
+ * @returns {Promise<string|null>} A local URL for the generated audio or null on error.
+ */
 async function generateAudioFromGoogle(text, cacheKey) {
     // Record usage BEFORE making the call
     await recordTtsUsage(text.length);
 
-    try {
+    // Split the text into manageable chunks for the API.
+    const textChunks = splitTextIntoChunks(text);
+
+    // This helper function fetches audio for a single text chunk.
+    const fetchAudioChunk = async (chunk) => {
         const response = await fetch(`https://texttospeech.googleapis.com/v1/text:synthesize?key=${ttsState.apiKey}`, {
             method: 'POST',
             body: JSON.stringify({
-                input: { text: text },
+                input: { text: chunk },
                 voice: { languageCode: ttsState.selectedVoiceName.substring(0, 5), name: ttsState.selectedVoiceName },
                 audioConfig: { audioEncoding: 'MP3' }
             })
         });
-        if (!response.ok) throw new Error(`Google TTS Error: ${(await response.json()).error.message}`);
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(`Google TTS Error: ${errorData.error.message}`);
+        }
+
         const data = await response.json();
-        const audioBlob = new Blob([Uint8Array.from(atob(data.audioContent), c => c.charCodeAt(0))], { type: 'audio/mp3' });
-        const localUrl = URL.createObjectURL(audioBlob);
+        // Decode the base64 audio content into a Uint8Array.
+        const audioBytes = Uint8Array.from(atob(data.audioContent), c => c.charCodeAt(0));
+        return new Blob([audioBytes], { type: 'audio/mp3' });
+    };
+
+    try {
+        // Process all chunks in parallel and wait for all of them to complete.
+        const audioBlobs = await Promise.all(textChunks.map(chunk => fetchAudioChunk(chunk)));
+
+        // Concatenate all the audio blobs into a single blob.
+        const concatenatedBlob = new Blob(audioBlobs, { type: 'audio/mp3' });
+
+        // Create a local URL for the final concatenated audio.
+        const localUrl = URL.createObjectURL(concatenatedBlob);
+
+        // Cache the final audio URL.
         ttsState.audioCache.set(cacheKey, localUrl);
         return localUrl;
+
     } catch (error) {
-        console.error(error);
-        stop(); // Stop playback on API error
+        console.error("Failed to generate concatenated audio:", error);
+        stop(); // Stop playback on API error.
         return null;
     }
 }
