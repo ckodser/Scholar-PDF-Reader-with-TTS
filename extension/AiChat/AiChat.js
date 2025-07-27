@@ -60,6 +60,10 @@ function cacheDomElements() {
     dom.tabsContainer = document.getElementById('chat-tabs-container');
     dom.newTabBtn = document.getElementById('chat-new-tab-btn');
     dom.headerTitle = document.getElementById('chat-header-title');
+    dom.deleteModal = document.getElementById('ai-chat-delete-modal');
+    dom.confirmDeleteYesBtn = document.getElementById('ai-chat-confirm-delete-yes');
+    dom.confirmDeleteNoBtn = document.getElementById('ai-chat-confirm-delete-no');
+
 }
 
 // --- Utility Functions ---
@@ -101,12 +105,22 @@ async function fetchAndEncodePdf() {
 }
 
 // --- UI Rendering and Manipulation ---
+function showDeleteConfirmation() {
+    dom.deleteModal.classList.remove('hidden');
+}
+
+function hideDeleteConfirmation() {
+    dom.deleteModal.classList.add('hidden');
+}
 
 async function toggleChatPanel() {
     aiChatState.isPanelOpen = !aiChatState.isPanelOpen;
     dom.chatPanel.classList.toggle('hidden', !aiChatState.isPanelOpen);
     if (aiChatState.isPanelOpen && aiChatState.tabs.length === 0) {
         await createNewTab();
+    }
+    if (!aiChatState.isPanelOpen) {
+        hideDeleteConfirmation();
     }
     dom.chatDeleteBtn.classList.toggle('hidden', !aiChatState.isPanelExpanded);
 }
@@ -115,6 +129,7 @@ function toggleChatSize() {
     aiChatState.isPanelExpanded = !aiChatState.isPanelExpanded;
     dom.chatPanel.classList.toggle('expanded', aiChatState.isPanelExpanded);
     dom.chatResizeBtn.querySelector('.material-symbols-outlined').textContent = aiChatState.isPanelExpanded ? 'close_fullscreen' : 'open_in_full';
+    hideDeleteConfirmation();
     dom.chatDeleteBtn.classList.toggle('hidden', !aiChatState.isPanelExpanded);
 }
 
@@ -519,7 +534,14 @@ async function initializeAiChat() {
     dom.chatResizeBtn.addEventListener('click', toggleChatSize);
     dom.newTabBtn.addEventListener('click', createNewTab);
     dom.chatSendBtn.addEventListener('click', handleSendMessage);
-    dom.chatDeleteBtn.addEventListener('click', deleteAllMessages)
+
+    dom.chatDeleteBtn.addEventListener('click', showDeleteConfirmation);
+    dom.confirmDeleteNoBtn.addEventListener('click', hideDeleteConfirmation);
+    dom.confirmDeleteYesBtn.addEventListener('click', async () => {
+        await deleteAllMessages();
+        hideDeleteConfirmation();
+    });
+
     dom.chatInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();

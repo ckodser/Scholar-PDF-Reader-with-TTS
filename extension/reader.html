@@ -34,8 +34,8 @@
             <span id="chat-header-title">Chat with PDF</span>
         </h3>
         <div class="chat-controls">
-            <button id="ai-chat-delete-btn" title="Toggle Size">
-                <span class="material-symbols-outlined">delete</span>
+            <button id="ai-chat-delete-btn" title="Delete All Chats">
+                <span class="material-symbols-outlined">delete_forever</span>
             </button>
             <button id="ai-chat-resize-btn" title="Toggle Size">
                 <span class="material-symbols-outlined">open_in_full</span>
@@ -65,6 +65,16 @@
     <div id="chat-processing-overlay" class="chat-processing-overlay hidden">
         <div class="loader"></div>
         <p>Analyzing PDF...</p>
+    </div>
+    <div id="ai-chat-delete-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <h3>Delete All Chats</h3>
+            <p>Are you sure you want to delete all chat history for this PDF? This action cannot be undone.</p>
+            <div class="modal-buttons">
+                <button id="ai-chat-confirm-delete-yes" class="modal-button-yes">Yes, Delete All</button>
+                <button id="ai-chat-confirm-delete-no" class="modal-button-no">Cancel</button>
+            </div>
+        </div>
     </div>
   </div>
 
