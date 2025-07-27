@@ -9,9 +9,15 @@ This extension adds annotation/TTS and Ai chat capabilities to the Google Schola
 - Undo and redo actions for annotations.
 - Import and export annotations into a JSON file.
 
-Currently, annotations are stored in the browser's local storage and associated with each document URL. The PDF files are not modified, but annotations persist across browser sessions.
+Currently, annotations/Chat history are stored in the browser's local storage and associated with each document URL. The PDF files are not modified, but annotations persist across browser sessions.
 
 ![Screenshot](screenshot.png)
+
+The normal functionality of Google Scholar is preserved. 
+
+![Screenshot](screenshot2.png)
+
+
 
 The extension maintains all the functionality of the original Google Scholar PDF Reader:
 
