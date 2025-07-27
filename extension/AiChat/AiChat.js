@@ -217,8 +217,8 @@ async function createNewTab() {
         isThinking: false,
     };
     aiChatState.tabs.push(newTab);
-    await saveConversations();
     await switchTab(tabId); // Await the switch, which also handles saving.
+    await saveConversations();
 }
 
 async function switchTab(tabId) {
@@ -489,7 +489,12 @@ async function loadConversations() {
                 ...tab,
                 isThinking: false,
             }));
-            aiChatState.activeTabId = pdfHistory.activeTabId || pdfHistory.tabs[0].id;
+            const activeTab = aiChatState.tabs.find(t => t.id === aiChatState.activeTabId);
+            if (activeTab){
+                aiChatState.activeTabId = activeTab.id;
+            }else{
+                aiChatState.activeTabId = pdfHistory.tabs[0].id;
+            }
 
             console.log(`Loaded and rehydrated ${aiChatState.tabs.length} chat tabs.`);
             logTabs()
