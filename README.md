@@ -102,15 +102,16 @@ These tokens are required for accessing the respective services and need to be c
 
 The following features are planned for future releases:
 
-- Shift enter for enter in chat/ double enter for sending the message. 
-- Add the option for third party proxy servers for APIs
+- Let the gemini provide citations in your pdf
+- Select some part of the paper and ask gemini about that part.
+- Change the model when ever you want in a chat. 
 - Adjusting reading speed, UI, backend, etc.
 - Add go to the reading part
 - Annotation/TTS/Ai Chats storage backup in the cloud (Google Drive, S3, or iCloud probably).
 - Underline and strikeout text.
 - Drawing tools (freehand, lines, shapes).
 - Text comments and sticky notes.
-- Movable and minimizable annotation bar.
+- Movable and minimizable annotation bar/AI chat.
 - Add more functionalities to the settings page, such as keyboard shortcut customization, annotation transfer between PDF files, and selective removal.
 
 ## Implementation Questions

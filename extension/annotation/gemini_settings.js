@@ -138,9 +138,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (apiKey) {
             elements.apiKeyInput.value = apiKey;
             state.apiKey = apiKey;
-            await validateApiKey(false); // Validate on load without showing status
+            elements.modelSelectionContainer.style.display = 'block';
+            elements.geminiUsageContainer.style.display = 'block';
+            renderModelSelection();
         }
-        loadAndDisplayUsage(); // Initial load
+        await loadAndDisplayUsage(); // Initial load
     };
 
     /**
@@ -165,8 +167,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    contents: [{ role: 'user', parts: [{ text: 'Hello' }] }],
-                    generationConfig: { maxOutputTokens: 1 }
+                    contents: [{ role: 'user', parts: [{ text: 'Hello' }] }]
                 }),
             });
 
